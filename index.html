@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Machina Mundi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --c-black:#0b0908;
+    --c-black-soft:#151210;
+    --c-marble:#ece3d1;
+    --c-marble-dim:#c9bda2;
+    --c-terracotta:#b5502e;
+    --c-terracotta-dim:#8a3d24;
+    --c-bronze:#b8894f;
+    --c-bronze-dark:#7c5a34;
+    --c-red:#6b2222;
+    --c-gold:#c9a227;
+    --font-display: 'Cinzel', serif;
+    --font-body: 'Jost', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; width:100%; height:100%;
+    background:var(--c-black);
+    font-family: var(--font-body);
+    overflow:hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #c{ position:fixed; inset:0; display:block; outline:none; }
+
+  /* ---------- Loading ---------- */
+  #loading{
+    position:fixed; inset:0; z-index:100;
+    background: radial-gradient(circle at 50% 40%, #1c1712 0%, var(--c-black) 70%);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--c-marble);
+    transition: opacity 1.1s ease;
+  }
+  #loading.hidden{ opacity:0; pointer-events:none; }
+  .ring-spin{
+    width:56px; height:56px; border-radius:50%;
+    border:1.5px solid rgba(201,162,39,0.18);
+    border-top-color: var(--c-gold);
+    border-right-color: var(--c-bronze);
+    animation: spin 1.4s linear infinite;
+    margin-bottom:22px;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  #loading .title{
+    font-family:var(--font-display); font-size:15px; letter-spacing:0.42em;
+    text-transform:uppercase; color:var(--c-marble-dim); font-weight:500;
+  }
+
+  /* ---------- Door state instructions ---------- */
+  #intro-instructions{
+    position:fixed; left:0; right:0; bottom:9%; z-index:40;
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    text-align:center; color:var(--c-marble); pointer-events:none;
+    opacity:0; transition:opacity 1.4s ease;
+  }
+  #intro-instructions.show{ opacity:1; }
+  #intro-instructions .push-label{
+    font-family:var(--font-display); font-size:13px; letter-spacing:0.38em;
+    text-transform:uppercase; color:var(--c-gold);
+    animation: pulseGlow 2.6s ease-in-out infinite;
+  }
+  #intro-instructions .sub{
+    font-size:12.5px; letter-spacing:0.06em; color:var(--c-marble-dim); font-weight:300;
+  }
+  @keyframes pulseGlow{
+    0%,100%{ opacity:0.55; letter-spacing:0.38em; }
+    50%{ opacity:1; letter-spacing:0.46em; }
+  }
+
+  /* ---------- Welcome ---------- */
+  #welcome-overlay{
+    position:fixed; inset:0; z-index:60;
+    display:flex; align-items:center; justify-content:center;
+    background:transparent;
+    pointer-events:none;
+  }
+  #welcome-text{
+    font-family:var(--font-display); color:var(--c-marble);
+    font-size:clamp(28px, 5vw, 54px); letter-spacing:0.28em; font-weight:500;
+    text-transform:uppercase; text-align:center; padding:0 20px;
+    opacity:0; transform: translateY(14px) scale(0.98);
+    text-shadow: 0 0 40px rgba(201,162,39,0.35);
+  }
+  #welcome-text.in{
+    opacity:1; transform:translateY(0) scale(1);
+    transition: opacity 2.1s ease, transform 2.1s ease;
+  }
+  #welcome-text.out{
+    opacity:0; transform:translateY(-10px) scale(1.02);
+    transition: opacity 1.6s ease, transform 1.6s ease;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:fixed; left:0; right:0; bottom:5%; z-index:30;
+    display:flex; justify-content:center; pointer-events:none;
+    opacity:0; transition:opacity 1.6s ease;
+  }
+  #hud.show{ opacity:1; }
+  #hud .pill{
+    font-size:11.5px; letter-spacing:0.12em; color:var(--c-marble-dim);
+    background:rgba(11,9,8,0.5); border:1px solid rgba(184,137,79,0.35);
+    padding:9px 20px; border-radius:100px; backdrop-filter: blur(6px);
+    font-weight:300;
+  }
+
+  #brandmark{
+    position:fixed; top:26px; left:30px; z-index:30;
+    font-family:var(--font-display); color:var(--c-marble);
+    font-size:13px; letter-spacing:0.32em; text-transform:uppercase;
+    opacity:0; transition:opacity 1.8s ease; pointer-events:none;
+  }
+  #brandmark.show{ opacity:0.85; }
+  #brandmark span{ color:var(--c-gold); }
+
+  /* ---------- Info Panel ---------- */
+  #panel{
+    position:fixed; top:0; right:0; height:100%;
+    width:min(400px, 92vw);
+    background: linear-gradient(160deg, rgba(21,18,16,0.97), rgba(11,9,8,0.98));
+    border-left: 1px solid rgba(184,137,79,0.4);
+    box-shadow: -30px 0 60px rgba(0,0,0,0.5);
+    z-index:50;
+    transform: translateX(100%);
+    transition: transform 0.7s cubic-bezier(.16,.84,.44,1);
+    padding: 74px 38px 40px;
+    display:flex; flex-direction:column;
+    overflow-y:auto;
+  }
+  #panel.open{ transform:translateX(0); }
+  #panel .eyebrow{
+    font-size:11px; letter-spacing:0.3em; text-transform:uppercase;
+    color:var(--c-gold); margin-bottom:14px; font-weight:500;
+  }
+  #panel h2{
+    font-family:var(--font-display); color:var(--c-marble);
+    font-size:28px; line-height:1.25; margin:0 0 6px; font-weight:600;
+    letter-spacing:0.01em;
+  }
+  #panel .subtitle{
+    color:var(--c-terracotta); font-size:14px; font-style:italic;
+    margin:0 0 26px; font-weight:400;
+  }
+  #panel .rule{
+    width:46px; height:2px; background:var(--c-bronze); margin:0 0 24px; opacity:0.7;
+  }
+  #panel p{
+    color:var(--c-marble-dim); font-size:15px; line-height:1.85; font-weight:300;
+    margin:0 0 14px;
+  }
+  #panel-close{
+    position:absolute; top:26px; right:28px;
+    width:38px; height:38px; border-radius:50%;
+    border:1px solid rgba(184,137,79,0.5); background:transparent;
+    color:var(--c-marble-dim); font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition: all 0.3s ease;
+  }
+  #panel-close:hover{ background:rgba(184,137,79,0.15); color:var(--c-marble); transform:rotate(90deg); }
+  #panel-index{
+    margin-top:auto; padding-top:28px; font-size:11px; letter-spacing:0.15em;
+    color:var(--c-bronze-dark); border-top:1px solid rgba(184,137,79,0.2);
+  }
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed; left:50%; bottom:12%; z-index:70;
+    transform: translate(-50%, 12px); 
+    background:rgba(11,9,8,0.88); border:1px solid rgba(201,162,39,0.45);
+    color:var(--c-marble); font-size:13px; letter-spacing:0.03em; font-weight:300;
+    padding:13px 24px; border-radius:8px; max-width:min(380px,86vw); text-align:center;
+    opacity:0; pointer-events:none; transition: all 0.6s ease; line-height:1.5;
+  }
+  #toast.show{ opacity:1; transform:translate(-50%, 0); }
+
+  ::-webkit-scrollbar{ width:6px; }
+  ::-webkit-scrollbar-thumb{ background:rgba(184,137,79,0.4); border-radius:3px; }
+
+  @media (prefers-reduced-motion: reduce){
+    #intro-instructions .push-label{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+  <canvas id="c"></canvas>
+
+  <div id="loading">
+    <div class="ring-spin"></div>
+    <div class="title">Machina Mundi</div>
+  </div>
+
+  <div id="brandmark">Machina <span>Mundi</span></div>
+
+  <div id="intro-instructions">
+    <div class="push-label">Push the doors</div>
+    <div class="sub">click and hold the bronze doors to enter</div>
+  </div>
+
+  <div id="welcome-overlay"><div id="welcome-text">Welcome to Machina Mundi</div></div>
+
+  <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click an artifact to learn more</div></div>
+
+  <div id="panel">
+    <button id="panel-close" aria-label="Close">&times;</button>
+    <div class="eyebrow" id="panel-eyebrow">Chapter</div>
+    <h2 id="panel-title">Title</h2>
+    <div class="subtitle" id="panel-subtitle">Subtitle</div>
+    <div class="rule"></div>
+    <p id="panel-body">Body</p>
+    <div id="panel-index">01 / 07</div>
+  </div>
+
+  <div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* =========================================================================
+   MACHINA MUNDI — a small rotunda that tells the story of the program.
+   Built entirely with primitive Three.js geometry and canvas textures.
+   ========================================================================= */
+
+var COLOR = {
+  black: 0x0b0908,
+  blackSoft: 0x1a1512,
+  marble: 0xece3d1,
+  marbleDim: 0xc9bda2,
+  terracotta: 0xb5502e,
+  terracottaDim: 0x8a3d24,
+  bronze: 0xb8894f,
+  bronzeDark: 0x6e4e2c,
+  red: 0x6b2222,
+  gold: 0xc9a227,
+};
+
+var ROOM_R = 15;
+var DOOR_ANGLE = -Math.PI/2; // door sits at (0, *, -R)
+var GAP = 0.52;
+
+/* -------------------------------------------------------------------------
+   Program content (all copy authored fresh from the org brief, no em dashes)
+   ------------------------------------------------------------------------- */
+var STOPS = [
+  {
+    key:'origins',
+    eyebrow:'Chapter One',
+    title:'Origins',
+    subtitle:'Where the idea began',
+    body:'Machina Mundi started as a small summer program, just three sessions long, built to close a gap. While well funded schools and corporate labs raced ahead in artificial intelligence, students in Hartford and East Hartford had little access to the tools shaping their future. Early on, students noticed something else. The chatbots they tried did not understand the way they actually talked. Most language models are trained on text that barely includes African American Vernacular English, so the technology was never built to hear an entire community. What began as a coding camp became a mission to fix the data itself.'
+  },
+  {
+    key:'camp',
+    eyebrow:'Chapter Two',
+    title:'AI Pathways Camp',
+    subtitle:'Learning by building',
+    body:'This is where it happens hands on. Students train small machine learning models, take apart the logic inside chatbots, and question the choices built into the systems they use every day. More than nine hundred students have gone through the program so far, moving from users of technology to builders of it.'
+  },
+  {
+    key:'pollen',
+    eyebrow:'Chapter Three',
+    title:'Project POLLEN',
+    subtitle:'A dataset that listens',
+    body:'Project POLLEN exists to correct a bias of representation. Working with local churches, schools, and families, the team recorded everyday, unscripted conversation and transcribed it exactly as spoken, without smoothing it into standard English. The result is ConvoAAVE, a growing open dataset of nearly fifty thousand words, published with full documentation. Models trained on it understood dialect better without flattening it, and the improved tools went right back to the classrooms and families who helped build them.'
+  },
+  {
+    key:'policy',
+    eyebrow:'Chapter Four',
+    title:'Federal Policy',
+    subtitle:'Taking it to Washington',
+    body:'Grassroots research does not stay local for long. Working with the office of Congressman John Larson and guidance from the Congressional Research Service, students authored research briefs on the gaps in AI education across Hartford\u2019s public schools. That research became the foundation of a federal grant proposal to fund AI education, teacher training, and programming for underserved schools. The proposal was introduced in 2026, and the team is preparing to testify before Congress in support of a bipartisan bill.'
+  },
+  {
+    key:'partners',
+    eyebrow:'Chapter Five',
+    title:'Partners',
+    subtitle:'A network built on trust',
+    body:'None of this happens alone. Code Ninjas hosted the earliest programs and helped shape the beginner curriculum. The YMCA carried the camp beyond the classroom. Local schools opened their doors, and neighborhood churches and community groups helped families feel safe joining Project POLLEN. City and federal offices, including Congressman Larson and Mayor Arunan Arulampalam, help turn grassroots work into lasting policy.'
+  },
+  {
+    key:'team',
+    eyebrow:'Chapter Six',
+    title:'The People',
+    subtitle:'Students building for students',
+    body:'Machina Mundi was founded by Karthik Srikumar, a student who built the first programs, led the ConvoAAVE dataset, and opened the earliest doors with the YMCA, Code Ninjas, and Congress. An advisory board of Code Ninjas co founders and a volunteer team of students, several now in college, keep the programs growing, one classroom and one dataset at a time.'
+  },
+  {
+    key:'recognition',
+    eyebrow:'Chapter Seven',
+    title:'Recognition',
+    subtitle:'Still early',
+    body:'Nine hundred students trained. Fifty thousand words collected. Five major partners embedded in the community. In 2026, Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations. The organization is now working toward a 2028 vision, scaling from local classrooms to federal legislation.'
+  }
+];
+
+/* -------------------------------------------------------------------------
+   Boot
+   ------------------------------------------------------------------------- */
+var canvas = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(COLOR.black);
+scene.fog = new THREE.FogExp2(COLOR.black, 0.018);
+
+var camera = new THREE.PerspectiveCamera(52, window.innerWidth/window.innerHeight, 0.1, 200);
+var DOOR_X = 0, DOOR_Z = -ROOM_R;
+var START_POS = new THREE.Vector3(0, 3.0, DOOR_Z - 10);
+var LOOK_POS = new THREE.Vector3(0, 2.6, DOOR_Z);
+camera.position.copy(START_POS);
+camera.lookAt(LOOK_POS);
+
+/* -------------------------------------------------------------------------
+   Texture helpers (all procedural canvas, zero external images)
+   ------------------------------------------------------------------------- */
+function mkCanvas(size){ var c=document.createElement('canvas'); c.width=c.height=size; return c; }
+
+function marbleTexture(baseHex, veinHex, size){
+  size = size||512;
+  var c = mkCanvas(size), ctx = c.getContext('2d');
+  ctx.fillStyle = '#'+baseHex.toString(16).padStart(6,'0');
+  ctx.fillRect(0,0,size,size);
+  ctx.globalAlpha = 0.18;
+  for(var i=0;i<26;i++){
+    ctx.strokeStyle = '#'+veinHex.toString(16).padStart(6,'0');
+    ctx.lineWidth = Math.random()*1.6+0.3;
+    ctx.beginPath();
+    var x = Math.random()*size, y=0;
+    ctx.moveTo(x,y);
+    for(var s=0;s<6;s++){
+      x += (Math.random()-0.5)*size*0.35;
+      y += size/6;
+      ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  var tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function mosaicFloorTexture(size){
+  size = size || 1024;
+  var c = mkCanvas(size), ctx = c.getContext('2d');
+  var cx = size/2, cy = size/2, R = size/2;
+  // base
+  ctx.fillStyle = '#e4dac4'; ctx.fillRect(0,0,size,size);
+  // concentric rings alternating tones
+  var palette = ['#e4dac4','#cabb95','#b5502e','#0b0908','#c9a227'];
+  var rings = 16;
+  for(var i=rings;i>0;i--){
+    var r = R*(i/rings);
+    ctx.beginPath();
+    ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle = palette[i%3===0? 2 : (i%5===0?4:(i%2===0?0:1))];
+    ctx.globalAlpha = (i%5===0)?1:0.85;
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // greek key border ring
+  var borderR = R*0.97, borderW = R*0.05;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx,cy,borderR,0,Math.PI*2);
+  ctx.arc(cx,cy,borderR-borderW,0,Math.PI*2,true);
+  ctx.clip();
+  ctx.fillStyle = '#0b0908'; ctx.fillRect(0,0,size,size);
+  ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 3;
+  var steps = 90;
+  for(var k=0;k<steps;k++){
+    var a = (k/steps)*Math.PI*2;
+    var x = cx + Math.cos(a)*borderR;
+    var y = cy + Math.sin(a)*borderR;
+    ctx.save();
+    ctx.translate(x,y); ctx.rotate(a);
+    ctx.strokeRect(-borderW*0.4, -borderW*0.4, borderW*0.55, borderW*0.55);
+    ctx.restore();
+  }
+  ctx.restore();
+  // central medallion
+  ctx.beginPath(); ctx.arc(cx,cy,R*0.12,0,Math.PI*2);
+  ctx.fillStyle = '#c9a227'; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,R*0.09,0,Math.PI*2);
+  ctx.fillStyle = '#0b0908'; ctx.fill();
+  // radial segment lines
+  ctx.strokeStyle = 'rgba(11,9,8,0.35)'; ctx.lineWidth = 1.5;
+  for(var seg=0; seg<32; seg++){
+    var ang = (seg/32)*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(ang)*R*0.14, cy + Math.sin(ang)*R*0.14);
+    ctx.lineTo(cx + Math.cos(ang)*borderR*0.98, cy + Math.sin(ang)*borderR*0.98);
+    ctx.stroke();
+  }
+  var tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+function bronzeDoorTexture(size){
+  size = size||512;
+  var c = mkCanvas(size), ctx = c.getContext('2d');
+  var g = ctx.createLinearGradient(0,0,size,size);
+  g.addColorStop(0,'#a9793f'); g.addColorStop(0.5,'#8a6236'); g.addColorStop(1,'#6e4e2c');
+  ctx.fillStyle = g; ctx.fillRect(0,0,size,size);
+  var rows=6, cols=4;
+  for(var r=0;r<rows;r++){
+    for(var col=0; col<cols; col++){
+      var x = size*(col+0.5)/cols, y = size*(r+0.5)/rows;
+      var rad = size/cols*0.28;
+      var rg = ctx.createRadialGradient(x-rad*0.3,y-rad*0.3,rad*0.1,x,y,rad);
+      rg.addColorStop(0,'#e8cd8f'); rg.addColorStop(0.5,'#b8894f'); rg.addColorStop(1,'#5b3f22');
+      ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fillStyle=rg; ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,rad*0.32,0,Math.PI*2); ctx.fillStyle='rgba(11,9,8,0.4)'; ctx.fill();
+    }
+  }
+  ctx.strokeStyle = 'rgba(11,9,8,0.5)'; ctx.lineWidth = 10;
+  ctx.strokeRect(14,14,size-28,size-28);
+  var tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+
+function softDot(size){
+  size = size||64;
+  var c = mkCanvas(size), ctx = c.getContext('2d');
+  var g = ctx.createRadialGradient(size/2,size/2,0,size/2,size/2,size/2);
+  g.addColorStop(0,'rgba(255,255,255,1)');
+  g.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,size,size);
+  return new THREE.CanvasTexture(c);
+}
+
+function labelSprite(text, sizeW, colorHex){
+  sizeW = sizeW || 512;
+  var c = document.createElement('canvas');
+  c.width = sizeW; c.height = sizeW*0.32;
+  var ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.font = '500 '+Math.floor(c.height*0.34)+'px Cinzel, serif';
+  ctx.fillStyle = colorHex || '#ece3d1';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 10;
+  ctx.fillText(text.toUpperCase(), c.width/2, c.height/2);
+  var tex = new THREE.CanvasTexture(c);
+  var mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
+  var sprite = new THREE.Sprite(mat);
+  sprite.scale.set(3.4, 3.4*(c.height/c.width), 1);
+  return sprite;
+}
+
+function numeralSprite(n){
+  var c = document.createElement('canvas'); c.width=128; c.height=128;
+  var ctx = c.getContext('2d');
+  ctx.beginPath(); ctx.arc(64,64,58,0,Math.PI*2);
+  ctx.fillStyle = 'rgba(11,9,8,0.75)'; ctx.fill();
+  ctx.lineWidth=3; ctx.strokeStyle='#c9a227'; ctx.stroke();
+  ctx.font = '600 54px Jost, sans-serif';
+  ctx.fillStyle = '#ece3d1'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(String(n), 64, 70);
+  var tex = new THREE.CanvasTexture(c);
+  var mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
+  var sp = new THREE.Sprite(mat);
+  sp.scale.set(0.7,0.7,1);
+  return sp;
+}
+
+/* -------------------------------------------------------------------------
+   Lighting
+   ------------------------------------------------------------------------- */
+var hemi = new THREE.HemisphereLight(0x6e5a3f, 0x0b0908, 0.55);
+scene.add(hemi);
+
+var oculusLight = new THREE.PointLight(0xffe3b0, 1.6, 40, 2);
+oculusLight.position.set(0, 12, 0);
+oculusLight.castShadow = true;
+oculusLight.shadow.mapSize.set(1024,1024);
+scene.add(oculusLight);
+
+var fillLight = new THREE.DirectionalLight(0x8a6236, 0.25);
+fillLight.position.set(-8, 6, -4);
+scene.add(fillLight);
+
+/* -------------------------------------------------------------------------
+   Floor
+   ------------------------------------------------------------------------- */
+var floorTex = mosaicFloorTexture(1024);
+var floor = new THREE.Mesh(
+  new THREE.CircleGeometry(ROOM_R, 72),
+  new THREE.MeshStandardMaterial({ map:floorTex, roughness:0.55, metalness:0.08 })
+);
+floor.rotation.x = -Math.PI/2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+/* -------------------------------------------------------------------------
+   Wall (C shaped, gap left open for the door)
+   ------------------------------------------------------------------------- */
+var wallTex = marbleTexture(COLOR.marble, COLOR.marbleDim, 512);
+wallTex.repeat.set(6,1.4);
+var wall = new THREE.Mesh(
+  new THREE.CylinderGeometry(ROOM_R, ROOM_R, 9, 64, 1, true, DOOR_ANGLE+GAP/2, Math.PI*2-GAP),
+  new THREE.MeshStandardMaterial({ map:wallTex, side:THREE.BackSide, roughness:0.85, metalness:0.02 })
+);
+wall.position.y = 4.5;
+wall.receiveShadow = true;
+scene.add(wall);
+
+// base skirt (dark stone plinth around wall)
+var skirt = new THREE.Mesh(
+  new THREE.CylinderGeometry(ROOM_R+0.05, ROOM_R+0.05, 0.9, 64, 1, true, DOOR_ANGLE+GAP/2, Math.PI*2-GAP),
+  new THREE.MeshStandardMaterial({ color:COLOR.black, roughness:0.7 })
+);
+skirt.position.y = 0.45;
+scene.add(skirt);
+
+/* -------------------------------------------------------------------------
+   Dome with oculus
+   ------------------------------------------------------------------------- */
+var domeTex = marbleTexture(COLOR.marble, COLOR.bronzeDark, 512);
+var dome = new THREE.Mesh(
+  new THREE.SphereGeometry(ROOM_R, 40, 24, 0, Math.PI*2, 0.22, Math.PI/2-0.02),
+  new THREE.MeshStandardMaterial({ map:domeTex, side:THREE.BackSide, roughness:0.8 })
+);
+dome.position.y = 9;
+scene.add(dome);
+
+// light shaft from oculus (soft additive cone)
+var shaftMat = new THREE.MeshBasicMaterial({ color:0xffdf9e, transparent:true, opacity:0.06, side:THREE.DoubleSide, depthWrite:false });
+var shaft = new THREE.Mesh(new THREE.ConeGeometry(4.2, 15, 32, 1, true), shaftMat);
+shaft.position.y = 12;
+scene.add(shaft);
+
+/* -------------------------------------------------------------------------
+   Colonnade
+   ------------------------------------------------------------------------- */
+var columns = new THREE.Group();
+var colTex = marbleTexture(COLOR.marble, COLOR.marbleDim, 256);
+colTex.repeat.set(1,3);
+var N_COL = 20;
+for(var i=0;i<N_COL;i++){
+  var ang = (i/N_COL)*Math.PI*2;
+  if(Math.abs(((ang - DOOR_ANGLE + Math.PI*3)%(Math.PI*2)) - Math.PI) < GAP*1.1) continue;
+  var cx = Math.cos(ang)*(ROOM_R-0.55), cz = Math.sin(ang)*(ROOM_R-0.55);
+  var colGroup = new THREE.Group();
+  var shaftMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.48,6.4,16), new THREE.MeshStandardMaterial({map:colTex, roughness:0.7}));
+  shaftMesh.position.y = 3.6; shaftMesh.castShadow = true;
+  var base = new THREE.Mesh(new THREE.CylinderGeometry(0.66,0.7,0.42,16), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.7}));
+  base.position.y = 0.4;
+  var capital = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.44,0.5,16), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6}));
+  capital.position.y = 7.05;
+  var abacus = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.22,1.2), new THREE.MeshStandardMaterial({color:COLOR.bronze, roughness:0.4, metalness:0.5}));
+  abacus.position.y = 7.4;
+  colGroup.add(shaftMesh, base, capital, abacus);
+  colGroup.position.set(cx, 0, cz);
+  colGroup.lookAt(0, 0, 0);
+  columns.add(colGroup);
+}
+scene.add(columns);
+
+/* -------------------------------------------------------------------------
+   Doors
+   ------------------------------------------------------------------------- */
+var doorTex = bronzeDoorTexture(512);
+var DOOR_W = (GAP*ROOM_R)/2 - 0.06;
+var DOOR_H = 6.2;
+var doorMat = new THREE.MeshStandardMaterial({ map:doorTex, roughness:0.4, metalness:0.65 });
+
+var leftPivot = new THREE.Group();
+leftPivot.position.set(DOOR_X - DOOR_W, 0, DOOR_Z);
+var leftDoor = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W, DOOR_H, 0.26), doorMat);
+leftDoor.position.set(DOOR_W/2, DOOR_H/2, 0);
+leftDoor.castShadow = true;
+leftPivot.add(leftDoor);
+scene.add(leftPivot);
+
+var rightPivot = new THREE.Group();
+rightPivot.position.set(DOOR_X + DOOR_W, 0, DOOR_Z);
+var rightDoor = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W, DOOR_H, 0.26), doorMat.clone());
+rightDoor.position.set(-DOOR_W/2, DOOR_H/2, 0);
+rightDoor.castShadow = true;
+rightPivot.add(rightDoor);
+scene.add(rightPivot);
+
+// pediment above the door
+var pedimentGroup = new THREE.Group();
+var pedBase = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W*2+0.6, 0.35, 0.5), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6}));
+pedBase.position.set(DOOR_X, DOOR_H+0.2, DOOR_Z);
+var tri = new THREE.Mesh(new THREE.ConeGeometry(DOOR_W+0.4, 1.3, 3, 1), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+tri.rotation.z = Math.PI/2; tri.rotation.y = Math.PI/2;
+tri.scale.set(0.5,1,1);
+tri.position.set(DOOR_X, DOOR_H+1.0, DOOR_Z+0.02);
+pedimentGroup.add(pedBase, tri);
+scene.add(pedimentGroup);
+
+// laurel accents flanking the pediment (small leaf clusters, no text)
+function leafCluster(x,z){
+  var g = new THREE.Group();
+  for(var i=0;i<7;i++){
+    var leaf = new THREE.Mesh(new THREE.SphereGeometry(0.14,8,6), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.5, roughness:0.35}));
+    leaf.scale.set(1,0.4,2.2);
+    var a = i*0.32;
+    leaf.position.set(Math.sin(a)*0.55, Math.cos(a)*0.18 + i*0.14, 0);
+    leaf.rotation.z = a;
+    g.add(leaf);
+  }
+  g.position.set(x, DOOR_H-0.3, z);
+  return g;
+}
+scene.add(leafCluster(DOOR_X-DOOR_W*2+0.3, DOOR_Z+0.1));
+scene.add(leafCluster(DOOR_X+DOOR_W*2-0.3, DOOR_Z+0.1));
+
+/* door hit target (invisible, generous) for easy clicking */
+var doorHit = new THREE.Mesh(new THREE.BoxGeometry(DOOR_W*2+1, DOOR_H+1, 1.4), new THREE.MeshBasicMaterial({visible:false}));
+doorHit.position.set(DOOR_X, DOOR_H/2, DOOR_Z);
+doorHit.userData.isDoor = true;
+scene.add(doorHit);
+
+/* -------------------------------------------------------------------------
+   Central armillary sphere (signature element - "the machine of the world")
+   ------------------------------------------------------------------------- */
+var armillary = new THREE.Group();
+var ringData = [
+  {r:2.6, tilt:0.3, axis:'x', color:COLOR.gold},
+  {r:2.1, tilt:1.1, axis:'y', color:COLOR.bronze},
+  {r:1.6, tilt:0.7, axis:'z', color:COLOR.marbleDim},
+  {r:3.1, tilt:1.9, axis:'x', color:COLOR.terracotta}
+];
+ringData.forEach(function(rd, idx){
+  var ring = new THREE.Mesh(
+    new THREE.TorusGeometry(rd.r, 0.035, 10, 64),
+    new THREE.MeshStandardMaterial({ color:rd.color, metalness:0.75, roughness:0.3 })
+  );
+  if(rd.axis==='x') ring.rotation.x = rd.tilt;
+  if(rd.axis==='y') ring.rotation.y = rd.tilt;
+  if(rd.axis==='z') ring.rotation.z = rd.tilt;
+  ring.userData.spinSpeed = 0.06 + idx*0.035;
+  ring.userData.spinAxis = rd.axis;
+  armillary.add(ring);
+});
+var core = new THREE.Mesh(
+  new THREE.SphereGeometry(0.42, 24, 24),
+  new THREE.MeshStandardMaterial({ color:0xffedc2, emissive:0xffb24a, emissiveIntensity:0.9, roughness:0.3 })
+);
+core.userData.isCore = true;
+armillary.add(core);
+var coreLight = new THREE.PointLight(0xffb24a, 1.1, 10, 2);
+armillary.add(coreLight);
+armillary.position.set(0, 5.6, 0);
+scene.add(armillary);
+
+/* -------------------------------------------------------------------------
+   Torches
+   ------------------------------------------------------------------------- */
+var torches = [];
+var TORCH_ANGLES = [DOOR_ANGLE+1.05, DOOR_ANGLE+2.2, DOOR_ANGLE+3.4, DOOR_ANGLE+4.55, DOOR_ANGLE-1.05, DOOR_ANGLE-2.2];
+TORCH_ANGLES.forEach(function(ang){
+  var tx = Math.cos(ang)*(ROOM_R-0.9), tz = Math.sin(ang)*(ROOM_R-0.9);
+  var g = new THREE.Group();
+  var bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,1.6,8), new THREE.MeshStandardMaterial({color:COLOR.bronzeDark, metalness:0.6, roughness:0.4}));
+  bracket.position.y = 3.4;
+  var bowl = new THREE.Mesh(new THREE.ConeGeometry(0.22,0.3,10), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.7, roughness:0.3}));
+  bowl.position.y = 4.25; bowl.rotation.x = Math.PI;
+  var flame = new THREE.Mesh(new THREE.SphereGeometry(0.16,8,8), new THREE.MeshStandardMaterial({color:0xffb24a, emissive:0xff8a2a, emissiveIntensity:1.4}));
+  flame.position.y = 4.5;
+  var light = new THREE.PointLight(0xff9a4a, 0.9, 9, 2);
+  light.position.y = 4.5;
+  g.add(bracket, bowl, flame, light);
+  g.position.set(tx*0.94, 0, tz*0.94);
+  g.lookAt(0, 4, 0);
+  g.userData.flame = flame; g.userData.light = light; g.userData.seed = Math.random()*10;
+  scene.add(g);
+  torches.push(g);
+});
+
+/* -------------------------------------------------------------------------
+   Dust motes drifting in the light shaft
+   ------------------------------------------------------------------------- */
+var moteCount = 260;
+var moteGeo = new THREE.BufferGeometry();
+var motePos = new Float32Array(moteCount*3);
+for(var m=0;m<moteCount;m++){
+  var rr = Math.random()*4.0;
+  var aa = Math.random()*Math.PI*2;
+  motePos[m*3] = Math.cos(aa)*rr;
+  motePos[m*3+1] = Math.random()*13;
+  motePos[m*3+2] = Math.sin(aa)*rr;
+}
+moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos,3));
+var moteMat = new THREE.PointsMaterial({ size:0.06, map:softDot(64), color:0xffe3b0, transparent:true, opacity:0.55, depthWrite:false, blending:THREE.AdditiveBlending });
+var motes = new THREE.Points(moteGeo, moteMat);
+scene.add(motes);
+
+/* =========================================================================
+   Pedestal icon builders
+   ========================================================================= */
+function pedestalBase(){
+  var g = new THREE.Group();
+  var base = new THREE.Mesh(new THREE.CylinderGeometry(0.95,1.05,0.5,20), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+  base.position.y = 0.25; base.castShadow = true; base.receiveShadow = true;
+  var shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.6,1.3,16), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.55}));
+  shaft.position.y = 1.15; shaft.castShadow = true;
+  var top = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.55,0.18,20), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.5, roughness:0.4}));
+  top.position.y = 1.9;
+  g.add(base, shaft, top);
+  return g;
+}
+
+function humanFigure(color){
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.14,0.42,10), new THREE.MeshStandardMaterial({color:color, roughness:0.6}));
+  body.position.y = 0.34;
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.11,12,12), new THREE.MeshStandardMaterial({color:0xc98a5e, roughness:0.6}));
+  head.position.y = 0.62;
+  var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.32,8), new THREE.MeshStandardMaterial({color:COLOR.black, roughness:0.7}));
+  legL.position.set(-0.06,0.1,0);
+  var legR = legL.clone(); legR.position.x = 0.06;
+  var armL = new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.28,8), new THREE.MeshStandardMaterial({color:color, roughness:0.6}));
+  armL.position.set(-0.16,0.38,0); armL.rotation.z = 0.4;
+  var armR = armL.clone(); armR.position.x = 0.16; armR.rotation.z = -0.4;
+  g.add(body,head,legL,legR,armL,armR);
+  g.castShadow = true;
+  return g;
+}
+
+function iconOrigins(){
+  var g = new THREE.Group();
+  var stump = new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.34,0.9,12), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6}));
+  stump.position.y = 0.45;
+  var chip = new THREE.Mesh(new THREE.ConeGeometry(0.16,0.3,8), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+  chip.position.set(0.1,0.95,0.05); chip.rotation.x = 0.6;
+  var flame = new THREE.Mesh(new THREE.SphereGeometry(0.15,10,10), new THREE.MeshStandardMaterial({color:0xffb24a, emissive:0xff7a1a, emissiveIntensity:1.5}));
+  flame.position.y = 1.05;
+  var light = new THREE.PointLight(0xffb24a, 0.7, 6, 2);
+  light.position.y = 1.1;
+  g.add(stump, chip, flame, light);
+  g.userData.flame = flame;
+  return g;
+}
+
+function iconCamp(){
+  var g = new THREE.Group();
+  var kid1 = humanFigure(COLOR.terracotta); kid1.position.set(-0.4,0,-0.1);
+  var kid2 = humanFigure(COLOR.bronze); kid2.position.set(0.42,0,0.15);
+  var ball = new THREE.Mesh(new THREE.SphereGeometry(0.11,12,12), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.4, roughness:0.35}));
+  ball.position.set(0, 0.4, 0);
+  ball.userData.isBall = true;
+  ball.userData.clicks = 0;
+  g.add(kid1, kid2, ball);
+  g.userData.kid1 = kid1; g.userData.kid2 = kid2; g.userData.ball = ball;
+  return g;
+}
+
+function iconPollen(){
+  var g = new THREE.Group();
+  var scroll = new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.85,12), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.5}));
+  scroll.rotation.z = Math.PI/2; scroll.position.y = 0.55;
+  var capL = new THREE.Mesh(new THREE.SphereGeometry(0.1,10,10), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.5}));
+  capL.position.set(-0.42,0.55,0);
+  var capR = capL.clone(); capR.position.x = 0.42;
+  g.add(scroll, capL, capR);
+  var words = new THREE.Group();
+  for(var i=0;i<10;i++){
+    var w = new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.02), new THREE.MeshStandardMaterial({color: i%2? COLOR.gold: COLOR.terracottaDim, roughness:0.5}));
+    var a = (i/10)*Math.PI*2;
+    w.userData.baseAngle = a;
+    w.userData.radius = 0.65 + (i%3)*0.08;
+    w.userData.yOff = 0.55 + Math.sin(i)*0.18;
+    words.add(w);
+  }
+  g.add(words);
+  g.userData.words = words;
+  return g;
+}
+
+function iconPolicy(){
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.55,0.5), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.55}));
+  body.position.y = 0.32;
+  var roof = new THREE.Mesh(new THREE.ConeGeometry(0.68,0.4,3), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.55}));
+  roof.rotation.y = Math.PI/6;
+  roof.scale.set(1,1,0.55);
+  roof.position.y = 0.78;
+  for(var i=-1;i<=1;i++){
+    var col = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,0.55,10), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.5}));
+    col.position.set(i*0.32, 0.32, 0.27);
+    g.add(col);
+  }
+  var wreath = new THREE.Mesh(new THREE.TorusGeometry(0.24,0.04,8,20), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.6, roughness:0.3}));
+  wreath.position.y = 1.25; wreath.rotation.x = Math.PI/2.4;
+  g.add(body, roof, wreath);
+  g.userData.wreath = wreath;
+  return g;
+}
+
+function iconPartners(){
+  var g = new THREE.Group();
+  var hub = new THREE.Mesh(new THREE.SphereGeometry(0.14,14,14), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.5, roughness:0.35}));
+  hub.position.y = 0.65;
+  g.add(hub);
+  var nodeColors = [COLOR.terracotta, COLOR.bronze, COLOR.marbleDim, COLOR.red, COLOR.gold];
+  for(var i=0;i<5;i++){
+    var a = (i/5)*Math.PI*2;
+    var nx = Math.cos(a)*0.55, nz = Math.sin(a)*0.55;
+    var node = new THREE.Mesh(new THREE.SphereGeometry(0.08,10,10), new THREE.MeshStandardMaterial({color:nodeColors[i], roughness:0.5}));
+    node.position.set(nx, 0.65+Math.sin(a*2)*0.12, nz);
+    var dx = node.position.x - hub.position.x, dy = node.position.y-hub.position.y, dz = node.position.z-hub.position.z;
+    var len = Math.sqrt(dx*dx+dy*dy+dz*dz);
+    var thread = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,len,6), new THREE.MeshStandardMaterial({color:COLOR.bronzeDark, roughness:0.6}));
+    thread.position.set((node.position.x+hub.position.x)/2,(node.position.y+hub.position.y)/2,(node.position.z+hub.position.z)/2);
+    thread.lookAt(node.position);
+    thread.rotateX(Math.PI/2);
+    g.add(node, thread);
+  }
+  return g;
+}
+
+function iconTeam(){
+  var g = new THREE.Group();
+  for(var i=-1;i<=1;i++){
+    var pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.14,0.35,10), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+    pedestal.position.set(i*0.42, 0.18, i*0.05);
+    var bust = new THREE.Mesh(new THREE.SphereGeometry(0.15,14,14), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.5}));
+    bust.position.set(i*0.42, 0.48, i*0.05);
+    bust.scale.set(0.85,1,0.85);
+    g.add(pedestal, bust);
+  }
+  return g;
+}
+
+function iconRecognition(){
+  var g = new THREE.Group();
+  var wreath = new THREE.Mesh(new THREE.TorusGeometry(0.42,0.05,10,28), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.6, roughness:0.3}));
+  wreath.rotation.x = Math.PI/2.2; wreath.position.y = 0.7;
+  g.add(wreath);
+  for(var i=0;i<16;i++){
+    var a = (i/16)*Math.PI*2;
+    var leaf = new THREE.Mesh(new THREE.SphereGeometry(0.06,8,6), new THREE.MeshStandardMaterial({color:COLOR.terracotta, roughness:0.5}));
+    leaf.scale.set(1,0.4,2);
+    leaf.position.set(Math.cos(a)*0.42, 0.7+Math.sin(a*3)*0.02, Math.sin(a)*0.42*0.35);
+    leaf.rotation.y = a;
+    g.add(leaf);
+  }
+  var medal = new THREE.Mesh(new THREE.OctahedronGeometry(0.16,0), new THREE.MeshStandardMaterial({color:0xffe3b0, emissive:0xc9a227, emissiveIntensity:0.5, metalness:0.6, roughness:0.25}));
+  medal.position.y = 0.7;
+  g.add(medal);
+  g.userData.medal = medal;
+  g.userData.wreath = wreath;
+  return g;
+}
+
+var ICON_BUILDERS = [iconOrigins, iconCamp, iconPollen, iconPolicy, iconPartners, iconTeam, iconRecognition];
+
+/* -------------------------------------------------------------------------
+   Assemble pedestals along the story path
+   ------------------------------------------------------------------------- */
+var pedestals = [];
+var arcStart = DOOR_ANGLE + 0.75;
+var arcSpan = Math.PI*2 - 1.5;
+var pathPoints = [];
+
+for(var s=0;s<STOPS.length;s++){
+  var angle = arcStart + (arcSpan*s/(STOPS.length-1));
+  var radius = 9.4;
+  var px = Math.cos(angle)*radius, pz = Math.sin(angle)*radius;
+  pathPoints.push(new THREE.Vector3(px,0.02,pz));
+
+  var group = new THREE.Group();
+  group.position.set(px,0,pz);
+  group.lookAt(0,0,0);
+
+  var base = pedestalBase();
+  group.add(base);
+
+  var icon = ICON_BUILDERS[s]();
+  icon.position.y = 2.0;
+  group.add(icon);
+
+  var label = labelSprite(STOPS[s].title, 640, '#ece3d1');
+  label.position.y = 3.15;
+  group.add(label);
+
+  var numeral = numeralSprite(s+1);
+  numeral.position.set(0, 1.3, 0.7);
+  group.add(numeral);
+
+  var hit = new THREE.Mesh(new THREE.SphereGeometry(1.3,10,10), new THREE.MeshBasicMaterial({visible:false}));
+  hit.position.y = 1.6;
+  group.add(hit);
+
+  group.userData.stopIndex = s;
+  group.userData.iconGroup = icon;
+  group.traverse(function(obj){ obj.userData.rootGroup = group; });
+
+  scene.add(group);
+  pedestals.push(group);
+}
+
+// glowing path connecting the stops (thin bronze inlay strip made of short segments)
+var pathGroup = new THREE.Group();
+for(var pi=0; pi<pathPoints.length-1; pi++){
+  var a = pathPoints[pi], b = pathPoints[pi+1];
+  var mid = a.clone().lerp(b,0.5);
+  var dist = a.distanceTo(b);
+  var seg = new THREE.Mesh(new THREE.BoxGeometry(dist,0.02,0.12), new THREE.MeshStandardMaterial({color:COLOR.gold, emissive:COLOR.gold, emissiveIntensity:0.25, metalness:0.4, roughness:0.4}));
+  seg.position.copy(mid); seg.position.y = 0.03;
+  seg.lookAt(b.x,0.03,b.z);
+  pathGroup.add(seg);
+}
+scene.add(pathGroup);
+
+/* -------------------------------------------------------------------------
+   Easter egg: a quietly different mosaic tile
+   ------------------------------------------------------------------------- */
+var secretAngle = arcStart + arcSpan*0.5;
+var secretPos = new THREE.Vector3(Math.cos(secretAngle+0.6)*4.2, 0.015, Math.sin(secretAngle+0.6)*4.2);
+var secretTile = new THREE.Mesh(
+  new THREE.CircleGeometry(0.28, 24),
+  new THREE.MeshStandardMaterial({ color:COLOR.gold, emissive:COLOR.gold, emissiveIntensity:0.15, roughness:0.5 })
+);
+secretTile.rotation.x = -Math.PI/2;
+secretTile.position.copy(secretPos);
+secretTile.userData.isSecret = true;
+scene.add(secretTile);
+
+function spawnOwl(pos){
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.SphereGeometry(0.16,12,12), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6}));
+  var earL = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.12,6), new THREE.MeshStandardMaterial({color:COLOR.marbleDim}));
+  earL.position.set(-0.08,0.16,0);
+  var earR = earL.clone(); earR.position.x = 0.08;
+  var eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.035,8,8), new THREE.MeshStandardMaterial({color:COLOR.black}));
+  eyeL.position.set(-0.06,0.03,0.14);
+  var eyeR = eyeL.clone(); eyeR.position.x = 0.06;
+  var wingL = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), new THREE.MeshStandardMaterial({color:COLOR.bronze}));
+  wingL.scale.set(0.4,1,0.8); wingL.position.set(-0.16,0,0);
+  var wingR = wingL.clone(); wingR.position.x = 0.16;
+  g.add(body,earL,earR,eyeL,eyeR,wingL,wingR);
+  g.position.copy(pos); g.position.y = 0.3;
+  g.userData.spawnTime = clock.getElapsedTime();
+  g.userData.wingL = wingL; g.userData.wingR = wingR;
+  scene.add(g);
+  transientObjects.push(g);
+}
+
+/* -------------------------------------------------------------------------
+   Confetti (gold leaf burst)
+   ------------------------------------------------------------------------- */
+var transientObjects = [];
+function spawnConfetti(pos){
+  for(var i=0;i<26;i++){
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(0.06,0.06), new THREE.MeshStandardMaterial({color: Math.random()>0.5?COLOR.gold:COLOR.terracotta, side:THREE.DoubleSide, roughness:0.5}));
+    m.position.copy(pos);
+    var speed = 1.2+Math.random()*1.6;
+    var ang = Math.random()*Math.PI*2;
+    m.userData.vel = new THREE.Vector3(Math.cos(ang)*speed*0.4, speed, Math.sin(ang)*speed*0.4);
+    m.userData.spawnTime = clock.getElapsedTime();
+    m.userData.spin = (Math.random()-0.5)*8;
+    scene.add(m);
+    transientObjects.push(m);
+  }
+}
+
+/* =========================================================================
+   Controls / State
+   ========================================================================= */
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enabled = false;
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.enablePan = false;
+controls.minDistance = 4.5;
+controls.maxDistance = 15;
+controls.minPolarAngle = 0.5;
+controls.maxPolarAngle = 1.45;
+controls.target.set(0, 2.2, 0);
+controls.rotateSpeed = 0.5;
+
+var STATE = 'loading'; // loading -> door -> opening -> welcome -> explore
+var doorProgress = 0;
+var cameraDollyT = 0;
+var doorOpenSpeed = 0.55;
+
+var clock = new THREE.Clock();
+var raycaster = new THREE.Raycaster();
+var pointer = new THREE.Vector2();
+
+function setPointer(e){
+  var x = (e.touches? e.touches[0].clientX : e.clientX);
+  var y = (e.touches? e.touches[0].clientY : e.clientY);
+  pointer.x = (x/window.innerWidth)*2-1;
+  pointer.y = -(y/window.innerHeight)*2+1;
+}
+
+function findRoot(obj){
+  var o = obj;
+  while(o){
+    if(o.userData && o.userData.rootGroup) return o.userData.rootGroup;
+    if(o.userData && (o.userData.isDoor || o.userData.isSecret || o.userData.isBall || o.userData.isCore)) return o;
+    o = o.parent;
+  }
+  return null;
+}
+
+function onPointerDown(e){
+  setPointer(e);
+  raycaster.setFromCamera(pointer, camera);
+
+  if(STATE === 'door'){
+    var hitDoor = raycaster.intersectObject(doorHit, false);
+    if(hitDoor.length){ openDoors(); }
+    return;
+  }
+
+  if(STATE !== 'explore') return;
+
+  var targets = pedestals.concat([secretTile, armillary]);
+  var intersects = raycaster.intersectObjects(targets, true);
+  if(!intersects.length) return;
+  var root = findRoot(intersects[0].object);
+  if(!root) return;
+
+  if(root.userData && typeof root.userData.stopIndex === 'number'){
+    openPanel(root.userData.stopIndex);
+    return;
+  }
+  if(root.userData && root.userData.isSecret){
+    spawnOwl(root.position);
+    showToast('You found a quiet detail. Machina Mundi listens closely, even in the small places.');
+    return;
+  }
+  // ball click (search deeper since ball is nested under a pedestal icon group)
+  var obj = intersects[0].object;
+  var p = obj;
+  while(p){
+    if(p.userData && p.userData.isBall){ handleBallClick(p); return; }
+    if(p === armillary){ 
+      showToast('You have found the center of Machina Mundi.');
+      return;
+    }
+    p = p.parent;
+  }
+}
+
+function handleBallClick(ball){
+  ball.userData.clicks++;
+  ball.userData.bounceBoost = 0.5;
+  if(ball.userData.clicks >= 5){
+    var worldPos = new THREE.Vector3();
+    ball.getWorldPosition(worldPos);
+    spawnConfetti(worldPos);
+    showToast('The kids are having a great time.');
+    ball.userData.clicks = 0;
+  }
+}
+
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+
+/* -------------------------------------------------------------------------
+   Door open sequence
+   ------------------------------------------------------------------------- */
+function openDoors(){
+  if(STATE !== 'door') return;
+  STATE = 'opening';
+  document.getElementById('intro-instructions').classList.remove('show');
+}
+
+/* -------------------------------------------------------------------------
+   Panel
+   ------------------------------------------------------------------------- */
+var panelEl = document.getElementById('panel');
+function openPanel(idx){
+  var s = STOPS[idx];
+  document.getElementById('panel-eyebrow').textContent = s.eyebrow;
+  document.getElementById('panel-title').textContent = s.title;
+  document.getElementById('panel-subtitle').textContent = s.subtitle;
+  document.getElementById('panel-body').textContent = s.body;
+  document.getElementById('panel-index').textContent = String(idx+1).padStart(2,'0') + ' / ' + String(STOPS.length).padStart(2,'0');
+  panelEl.classList.add('open');
+}
+document.getElementById('panel-close').addEventListener('click', function(){
+  panelEl.classList.remove('open');
+});
+
+/* -------------------------------------------------------------------------
+   Toast
+   ------------------------------------------------------------------------- */
+var toastEl = document.getElementById('toast');
+var toastTimer = null;
+function showToast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 3600);
+}
+
+/* -------------------------------------------------------------------------
+   Resize
+   ------------------------------------------------------------------------- */
+window.addEventListener('resize', function(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* -------------------------------------------------------------------------
+   Boot sequence
+   ------------------------------------------------------------------------- */
+setTimeout(function(){
+  document.getElementById('loading').classList.add('hidden');
+  STATE = 'door';
+  document.getElementById('intro-instructions').classList.add('show');
+}, 1400);
+
+/* -------------------------------------------------------------------------
+   Animate
+   ------------------------------------------------------------------------- */
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+
+function animate(){
+  requestAnimationFrame(animate);
+  var dt = Math.min(clock.getDelta(), 0.05);
+  var t = clock.getElapsedTime();
+
+  // torches flicker
+  torches.forEach(function(tg){
+    var seed = tg.userData.seed;
+    var flick = 0.75 + Math.sin(t*9+seed)*0.12 + Math.sin(t*23+seed)*0.08 + (Math.random()-0.5)*0.06;
+    tg.userData.light.intensity = 0.7*flick;
+    tg.userData.flame.scale.setScalar(0.9+flick*0.25);
+  });
+  oculusLight.intensity = 1.5 + Math.sin(t*0.6)*0.08;
+
+  // armillary rotation
+  armillary.rotation.y += dt*0.12;
+  armillary.children.forEach(function(ring){
+    if(ring.userData.spinSpeed){
+      if(ring.userData.spinAxis==='x') ring.rotation.x += dt*ring.userData.spinSpeed;
+      if(ring.userData.spinAxis==='y') ring.rotation.y += dt*ring.userData.spinSpeed;
+      if(ring.userData.spinAxis==='z') ring.rotation.z += dt*ring.userData.spinSpeed;
+    }
+    if(ring.userData.isCore){
+      ring.scale.setScalar(1+Math.sin(t*2)*0.06);
+    }
+  });
+
+  // dust motes drift upward, wrap
+  var posAttr = moteGeo.attributes.position;
+  for(var mi=0; mi<moteCount; mi++){
+    var yv = posAttr.getY(mi) + dt*0.35;
+    if(yv > 13) yv = 0;
+    posAttr.setY(mi, yv);
+    posAttr.setX(mi, posAttr.getX(mi) + Math.sin(t*0.5+mi)*0.0009);
+  }
+  posAttr.needsUpdate = true;
+
+  // secret tile subtle pulse
+  secretTile.material.emissiveIntensity = 0.1 + Math.sin(t*1.4)*0.08;
+
+  // pedestal icon animations
+  pedestals.forEach(function(p, idx){
+    var icon = p.userData.iconGroup;
+    icon.rotation.y = Math.sin(t*0.25 + idx)*0.15;
+
+    if(icon.userData.flame){
+      icon.userData.flame.scale.setScalar(0.9+Math.sin(t*8+idx)*0.15);
+    }
+    if(icon.userData.ball){
+      var ball = icon.userData.ball;
+      var boost = ball.userData.bounceBoost || 0;
+      if(boost>0){ ball.userData.bounceBoost = Math.max(0, boost - dt*0.6); }
+      var h = 0.4 + Math.abs(Math.sin(t*2.4))*(0.28+boost);
+      ball.position.y = h;
+      ball.position.x = Math.sin(t*0.7)*0.35;
+      icon.userData.kid1.rotation.y = Math.sin(t*1.2)*0.3;
+      icon.userData.kid2.rotation.y = Math.sin(t*1.2+1.5)*0.3;
+      icon.userData.kid1.position.y = Math.abs(Math.sin(t*2.4))*0.04;
+      icon.userData.kid2.position.y = Math.abs(Math.sin(t*2.4+0.8))*0.04;
+    }
+    if(icon.userData.words){
+      icon.userData.words.children.forEach(function(w, wi){
+        var a = w.userData.baseAngle + t*0.4;
+        w.position.set(Math.cos(a)*w.userData.radius, w.userData.yOff + Math.sin(t+wi)*0.05, Math.sin(a)*w.userData.radius);
+        w.rotation.y = a;
+      });
+    }
+    if(icon.userData.wreath){
+      icon.userData.wreath.rotation.z += dt*0.3;
+    }
+    if(icon.userData.medal){
+      icon.userData.medal.rotation.y += dt*0.6;
+    }
+  });
+
+  // transient objects (owl, confetti)
+  for(var ti = transientObjects.length-1; ti>=0; ti--){
+    var obj = transientObjects[ti];
+    var age = t - obj.userData.spawnTime;
+    if(obj.userData.vel){
+      obj.userData.vel.y -= dt*1.8;
+      obj.position.addScaledVector(obj.userData.vel, dt);
+      obj.rotation.z += dt*obj.userData.spin;
+      obj.material.opacity = Math.max(0, 1-age/1.6);
+      obj.material.transparent = true;
+      if(age>1.6){ scene.remove(obj); transientObjects.splice(ti,1); }
+    } else if(obj.userData.wingL){
+      obj.position.y += dt*0.9;
+      obj.userData.wingL.rotation.z = Math.sin(t*14)*0.5;
+      obj.userData.wingR.rotation.z = -Math.sin(t*14)*0.5;
+      obj.children.forEach(function(c){ c.material.transparent = true; c.material.opacity = Math.max(0, 1-age/2.0); });
+      if(age>2.0){ scene.remove(obj); transientObjects.splice(ti,1); }
+    }
+  }
+
+  // state machine
+  if(STATE === 'door'){
+    doorHit.material.opacity = 1;
+  } else if(STATE === 'opening'){
+    doorProgress = Math.min(1, doorProgress + dt*doorOpenSpeed);
+    var eased = easeInOutCubic(doorProgress);
+    leftPivot.rotation.y = -eased*2.05;
+    rightPivot.rotation.y = eased*2.05;
+
+    cameraDollyT = Math.min(1, cameraDollyT + dt*0.22);
+    var camEase = easeInOutCubic(cameraDollyT);
+    var endPos = new THREE.Vector3(0, 3.4, 2.5);
+    camera.position.lerpVectors(START_POS, endPos, camEase);
+    var lookTarget = new THREE.Vector3().lerpVectors(LOOK_POS, new THREE.Vector3(0,2.6,0), camEase);
+    camera.lookAt(lookTarget);
+
+    if(doorProgress>=1 && cameraDollyT>=1){
+      STATE = 'welcome';
+      document.getElementById('welcome-text').classList.add('in');
+      setTimeout(function(){
+        document.getElementById('welcome-text').classList.remove('in');
+        document.getElementById('welcome-text').classList.add('out');
+      }, 2400);
+      setTimeout(function(){
+        STATE = 'explore';
+        controls.object.position.copy(camera.position);
+        controls.update();
+        controls.enabled = true;
+        document.getElementById('hud').classList.add('show');
+        document.getElementById('brandmark').classList.add('show');
+      }, 4100);
+    }
+  } else if(STATE === 'explore'){
+    controls.update();
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+})();
+</script>
+</body>
+</html>
