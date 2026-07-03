@@ -257,7 +257,48 @@
   ::-webkit-scrollbar{ width:6px; }
   ::-webkit-scrollbar-thumb{ background:rgba(184,137,79,0.4); border-radius:3px; }
 
-  @media (prefers-reduced-motion: reduce){
+  /* ---------- Guestbook modal ---------- */
+  #guestbook-modal{
+    position:fixed; inset:0; z-index:90; display:none;
+    align-items:center; justify-content:center;
+    background:rgba(6,5,4,0.72); backdrop-filter: blur(4px);
+  }
+  #guestbook-modal.open{ display:flex; }
+  #guestbook-box{
+    width:min(440px,88vw); background:linear-gradient(160deg, rgba(21,18,16,0.98), rgba(11,9,8,0.98));
+    border:1px solid rgba(178,255,214,0.35); border-radius:14px; padding:30px 30px 26px;
+    box-shadow:0 30px 80px rgba(0,0,0,0.6);
+  }
+  #guestbook-box .eyebrow{ font-size:11px; letter-spacing:0.3em; text-transform:uppercase; color:var(--c-aqua); margin-bottom:10px; }
+  #guestbook-box h3{ font-family:var(--font-display); color:var(--c-frost); font-size:21px; margin:0 0 8px; font-weight:600; }
+  #guestbook-box p.hint{ color:var(--c-lightblue); font-size:12.5px; margin:0 0 18px; font-weight:300; }
+  #guestbook-input{
+    width:100%; min-height:90px; resize:none; border-radius:8px; padding:12px 14px;
+    background:rgba(255,255,255,0.05); border:1px solid rgba(178,255,214,0.3);
+    color:var(--c-marble); font-family:var(--font-body); font-size:14px; line-height:1.5;
+    outline:none;
+  }
+  #guestbook-input:focus{ border-color:var(--c-blue); }
+  #guestbook-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:16px; }
+  #guestbook-cancel, #guestbook-submit{
+    padding:10px 20px; border-radius:8px; font-size:12.5px; letter-spacing:0.06em;
+    text-transform:uppercase; cursor:pointer; border:none; font-family:var(--font-body); font-weight:500;
+  }
+  #guestbook-cancel{ background:transparent; color:var(--c-marble-dim); border:1px solid rgba(255,255,255,0.15); }
+  #guestbook-submit{ background:linear-gradient(120deg, var(--c-blue), var(--c-amethyst)); color:#fff; }
+  #guestbook-submit:hover{ filter:brightness(1.1); }
+
+  /* ---------- Quote overlay (reflection bench) ---------- */
+  #quote-overlay{
+    position:fixed; inset:0; z-index:55; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition:opacity 1.4s ease; text-align:center;
+  }
+  #quote-overlay.show{ opacity:1; }
+  #quote-overlay .q{
+    max-width:560px; padding:0 24px; font-family:var(--font-display); font-style:italic;
+    font-size:clamp(18px,2.6vw,26px); color:var(--c-frost); line-height:1.55;
+    text-shadow:0 0 30px rgba(30,144,255,0.3);
+  }
     #intro-instructions .push-label{ animation:none; }
   }
 </style>
@@ -290,7 +331,7 @@
 
   <div id="welcome-overlay"><div id="welcome-text">Welcome to Machina Mundi</div></div>
 
-  <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click an artifact, or use &#8592; &#8594; to move through the story</div></div>
+  <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click anything that glows &nbsp;&middot;&nbsp; &#8592; &#8594; moves through the story</div></div>
 
   <div id="panel">
     <button id="panel-close" aria-label="Close">&times;</button>
@@ -305,8 +346,23 @@
 
   <div id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <div id="quote-overlay"><div class="q" id="quote-text"></div></div>
+
+  <div id="guestbook-modal">
+    <div id="guestbook-box">
+      <div class="eyebrow">Leave a voice</div>
+      <h3>Add your message</h3>
+      <p class="hint">Your note joins the scroll floating above the guestbook, just for this visit.</p>
+      <textarea id="guestbook-input" maxlength="140" placeholder="Say something to Machina Mundi..."></textarea>
+      <div id="guestbook-actions">
+        <button id="guestbook-cancel">Cancel</button>
+        <button id="guestbook-submit">Add my voice</button>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 (function(){
 "use strict";
@@ -334,6 +390,7 @@ var COLOR = {
   amethyst: 0xAA78A6,
 };
 var BRAND = [COLOR.blue, COLOR.aqua, COLOR.lightblue, COLOR.amethyst, COLOR.frost];
+var SKIN_TONES = [0xf6dfc4, 0xe0ac69, 0xc98a5e, 0xa9673a, 0x8d5524, 0x6b4226, 0x4a2b17];
 
 var ROOM_R = 15;
 var DOOR_ANGLE = -Math.PI/2; // door sits at (0, *, -R)
@@ -390,7 +447,7 @@ var STOPS = [
     eyebrow:'Chapter Seven',
     title:'Recognition',
     subtitle:'Still early',
-    body:'Nine hundred students trained. Fifty thousand words collected. Five major partners embedded in the community. In 2026, Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations. The organization is now working toward a 2028 vision, scaling from local classrooms to federal legislation.'
+    body:'Nine hundred students trained. Fifty thousand words collected. Five major partners embedded in the community. In 2026, Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations. The organization is now working toward a 2028 vision, scaling from local classrooms to federal legislation. That means growing AI Pathways Camp into more districts, expanding ConvoAAVE well past its first fifty thousand words, training teachers as well as students, and pushing the 2026 federal proposal all the way through Congress. The 2028 hourglass near the center of the room marks that countdown. Give it a click.'
   }
 ];
 
@@ -720,6 +777,51 @@ doorHit.userData.isDoor = true;
 scene.add(doorHit);
 
 /* -------------------------------------------------------------------------
+   Wall of Voices — a ring of small lit markers, one for every voice that
+   Machina Mundi's data work tries to make sure the machine can hear.
+   Colors mix the skin tone and brand palettes on purpose.
+   ------------------------------------------------------------------------- */
+var VOICE_COLORS = SKIN_TONES.concat(BRAND);
+var voicesGroup = new THREE.Group();
+var VOICE_COUNT = 20;
+for(var vi=0; vi<VOICE_COUNT; vi++){
+  var vcolor = VOICE_COLORS[vi % VOICE_COLORS.length];
+  var vang = (vi/VOICE_COUNT)*Math.PI*2;
+  var vr = 3.7;
+  var vh = 0.45 + (vi%4)*0.14;
+  var pillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045,0.065,vh,8),
+    new THREE.MeshStandardMaterial({ color:vcolor, emissive:vcolor, emissiveIntensity:0.55, roughness:0.4 })
+  );
+  pillar.position.set(Math.cos(vang)*vr, vh/2, Math.sin(vang)*vr);
+  pillar.userData.baseH = vh;
+  pillar.userData.phase = vi*0.7;
+  pillar.userData.isVoice = true;
+  pillar.userData.rootGroup = pillar;
+  voicesGroup.add(pillar);
+}
+scene.add(voicesGroup);
+
+var voiceWisps = [];
+for(var wi=0; wi<44; wi++){
+  var wcolor = VOICE_COLORS[wi % VOICE_COLORS.length];
+  var wpillar = voicesGroup.children[wi % voicesGroup.children.length];
+  var wmesh = new THREE.Mesh(new THREE.SphereGeometry(0.032,8,8), new THREE.MeshBasicMaterial({ color:wcolor, transparent:true, opacity:0.85 }));
+  wmesh.userData.origin = wpillar.position.clone().setY(wpillar.userData.baseH);
+  wmesh.userData.t = Math.random();
+  wmesh.userData.speed = 0.12 + Math.random()*0.09;
+  scene.add(wmesh);
+  voiceWisps.push(wmesh);
+}
+
+var VOICE_TOASTS = [
+  'Every dialect carries meaning. The dataset is built to prove it.',
+  'Nearly fifty thousand words, spoken naturally, transcribed as spoken.',
+  'A voice recorded with consent becomes a voice a machine can finally understand.',
+  'Representation is not an afterthought here. It is the whole point.'
+];
+
+/* -------------------------------------------------------------------------
    Central armillary sphere (signature element - "the machine of the world")
    ------------------------------------------------------------------------- */
 var armillary = new THREE.Group();
@@ -756,7 +858,7 @@ scene.add(armillary);
    Torches
    ------------------------------------------------------------------------- */
 var torches = [];
-var TORCH_ANGLES = [DOOR_ANGLE+1.05, DOOR_ANGLE+2.2, DOOR_ANGLE+3.4, DOOR_ANGLE+4.55, DOOR_ANGLE-1.05, DOOR_ANGLE-2.2];
+var TORCH_ANGLES = [DOOR_ANGLE+1.9, DOOR_ANGLE+3.6, DOOR_ANGLE-1.9];
 TORCH_ANGLES.forEach(function(ang){
   var tx = Math.cos(ang)*(ROOM_R-0.9), tz = Math.sin(ang)*(ROOM_R-0.9);
   var g = new THREE.Group();
@@ -812,11 +914,12 @@ function pedestalBase(){
   return g;
 }
 
-function humanFigure(color){
+function humanFigure(color, skinTone){
+  skinTone = skinTone || SKIN_TONES[Math.floor(Math.random()*SKIN_TONES.length)];
   var g = new THREE.Group();
   var body = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.14,0.42,10), new THREE.MeshStandardMaterial({color:color, roughness:0.6}));
   body.position.y = 0.34;
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.11,12,12), new THREE.MeshStandardMaterial({color:0xc98a5e, roughness:0.6}));
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.11,12,12), new THREE.MeshStandardMaterial({color:skinTone, roughness:0.6}));
   head.position.y = 0.62;
   var legL = new THREE.Mesh(new THREE.CylinderGeometry(0.045,0.045,0.32,8), new THREE.MeshStandardMaterial({color:COLOR.black, roughness:0.7}));
   legL.position.set(-0.06,0.1,0);
@@ -846,14 +949,16 @@ function iconOrigins(){
 
 function iconCamp(){
   var g = new THREE.Group();
-  var kid1 = humanFigure(COLOR.terracotta); kid1.position.set(-0.4,0,-0.1);
-  var kid2 = humanFigure(COLOR.bronze); kid2.position.set(0.42,0,0.15);
+  var kid1 = humanFigure(COLOR.terracotta, SKIN_TONES[1]); kid1.position.set(-0.42,0,-0.12);
+  var kid2 = humanFigure(COLOR.bronze, SKIN_TONES[4]); kid2.position.set(0.44,0,0.16);
+  var kid3 = humanFigure(COLOR.blue, SKIN_TONES[0]); kid3.position.set(0.02,0,-0.42);
+  kid3.scale.setScalar(0.85);
   var ball = new THREE.Mesh(new THREE.SphereGeometry(0.11,12,12), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.4, roughness:0.35}));
   ball.position.set(0, 0.4, 0);
   ball.userData.isBall = true;
   ball.userData.clicks = 0;
-  g.add(kid1, kid2, ball);
-  g.userData.kid1 = kid1; g.userData.kid2 = kid2; g.userData.ball = ball;
+  g.add(kid1, kid2, kid3, ball);
+  g.userData.kid1 = kid1; g.userData.kid2 = kid2; g.userData.kid3 = kid3; g.userData.ball = ball;
   return g;
 }
 
@@ -923,10 +1028,11 @@ function iconPartners(){
 
 function iconTeam(){
   var g = new THREE.Group();
+  var tones = [SKIN_TONES[2], SKIN_TONES[5], SKIN_TONES[0]];
   for(var i=-1;i<=1;i++){
     var pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.14,0.35,10), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
     pedestal.position.set(i*0.42, 0.18, i*0.05);
-    var bust = new THREE.Mesh(new THREE.SphereGeometry(0.15,14,14), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.5}));
+    var bust = new THREE.Mesh(new THREE.SphereGeometry(0.15,14,14), new THREE.MeshStandardMaterial({color:tones[i+1], roughness:0.5}));
     bust.position.set(i*0.42, 0.48, i*0.05);
     bust.scale.set(0.85,1,0.85);
     g.add(pedestal, bust);
@@ -1014,6 +1120,404 @@ for(var pi=0; pi<pathPoints.length-1; pi++){
   pathGroup.add(seg);
 }
 scene.add(pathGroup);
+/* =========================================================================
+   More things to do and see around the room
+   ========================================================================= */
+
+function messageSprite(text){
+  var c = document.createElement('canvas'); c.width = 512; c.height = 220;
+  var ctx = c.getContext('2d');
+  ctx.font = '400 25px Jost, sans-serif';
+  ctx.fillStyle = '#ece3d1';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0,0,0,0.85)'; ctx.shadowBlur = 8;
+  var words = text.split(' '), lines = [], line = '';
+  words.forEach(function(w){
+    var test = line ? line+' '+w : w;
+    if(ctx.measureText(test).width > 460 && line){ lines.push(line); line = w; } else line = test;
+  });
+  lines.push(line);
+  lines = lines.slice(0,4);
+  var startY = 110 - (lines.length-1)*17;
+  lines.forEach(function(l,i){ ctx.fillText(l, 256, startY + i*34); });
+  var tex = new THREE.CanvasTexture(c);
+  var mat = new THREE.SpriteMaterial({ map:tex, transparent:true, depthWrite:false });
+  var sp = new THREE.Sprite(mat);
+  sp.scale.set(2.3, 1.0, 1);
+  return sp;
+}
+
+/* ---- Fact niches along the wall ---- */
+var FACTS = [
+  'The name Machina Mundi points to something ambitious. A machine built to understand the whole world, not just part of it.',
+  'The very first version of the camp ran for just three afternoons before it grew into something much bigger.',
+  'ConvoAAVE was never scraped from the internet. Every word was recorded with the consent of the person speaking.',
+  'Hartford and East Hartford sit only minutes apart, and this program was built to serve both at once.',
+  'Most of the team is still in high school or college. Several started as students in the very camps they now help run.',
+  'In 2026, Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations, with a national vision still ahead.'
+];
+var VISION_2028 = [
+  'The 2028 vision: scaling from local classrooms to federal legislation, one grant and one bill at a time.',
+  'Growing AI Pathways Camp beyond Hartford and East Hartford into more Connecticut districts, then more states.',
+  'Expanding ConvoAAVE far past fifty thousand words, and opening the same process to other underrepresented dialects.',
+  'Turning the 2026 federal proposal into passed, funded legislation, with Machina Mundi testimony helping carry it there.',
+  'Training more teachers, not just students, so bias-aware AI education can outlast any one classroom or camp.',
+  'Building lasting partnerships with universities and industry, so the pipeline from student to builder never has to reset.'
+];
+var nicheAngles = [
+  DOOR_ANGLE+0.95, DOOR_ANGLE+2.05, DOOR_ANGLE+3.15, DOOR_ANGLE+4.25, DOOR_ANGLE-1.6, DOOR_ANGLE-0.55
+];
+var niches = [];
+nicheAngles.forEach(function(ang, ni){
+  var nx = Math.cos(ang)*(ROOM_R-0.35), nz = Math.sin(ang)*(ROOM_R-0.35);
+  var g = new THREE.Group();
+  var frame = new THREE.Mesh(new THREE.TorusGeometry(0.32,0.028,8,24), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.6, roughness:0.35, emissive:BRAND[ni%BRAND.length], emissiveIntensity:0.25}));
+  var orb = new THREE.Mesh(new THREE.SphereGeometry(0.11,14,14), new THREE.MeshStandardMaterial({color:BRAND[ni%BRAND.length], emissive:BRAND[ni%BRAND.length], emissiveIntensity:0.6, roughness:0.3}));
+  var mark = new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.014,0.16,6), new THREE.MeshStandardMaterial({color:0x0b0908}));
+  mark.position.y = 0.02;
+  var dot = new THREE.Mesh(new THREE.SphereGeometry(0.02,6,6), new THREE.MeshStandardMaterial({color:0x0b0908}));
+  dot.position.y = -0.09;
+  orb.add(mark, dot);
+  g.add(frame, orb);
+  g.position.set(nx, 3.1, nz);
+  g.lookAt(0, 3.1, 0);
+  g.userData.isNiche = true;
+  g.userData.factIndex = ni;
+  g.userData.rootGroup = g;
+  g.userData.orb = orb;
+  scene.add(g);
+  niches.push(g);
+});
+
+/* ---- Guestbook near the entrance ---- */
+var guestbookGroup = new THREE.Group();
+var gbStand = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.4,1.0,14), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+gbStand.position.y = 0.5;
+var gbPageL = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.02,0.38), new THREE.MeshStandardMaterial({color:0xf3ecdc, roughness:0.7}));
+gbPageL.position.set(-0.25,1.02,0); gbPageL.rotation.z = 0.12;
+var gbPageR = gbPageL.clone(); gbPageR.position.x = 0.25; gbPageR.rotation.z = -0.12;
+var gbSpine = new THREE.Mesh(new THREE.BoxGeometry(0.04,0.03,0.4), new THREE.MeshStandardMaterial({color:COLOR.terracottaDim, roughness:0.6}));
+gbSpine.position.y = 1.02;
+guestbookGroup.add(gbStand, gbPageL, gbPageR, gbSpine);
+var gbLabel = labelSprite('Leave a Voice', 560, '#B2FFD6');
+gbLabel.position.y = 1.85;
+guestbookGroup.add(gbLabel);
+var gbHit = new THREE.Mesh(new THREE.SphereGeometry(0.9,10,10), new THREE.MeshBasicMaterial({visible:false}));
+gbHit.position.y = 1.0;
+guestbookGroup.add(gbHit);
+var gbAngle = DOOR_ANGLE + 0.02;
+guestbookGroup.position.set(Math.cos(gbAngle)*(ROOM_R-3.4), 0, Math.sin(gbAngle)*(ROOM_R-3.4));
+guestbookGroup.lookAt(0,0,0);
+guestbookGroup.userData.isGuestbook = true;
+guestbookGroup.userData.rootGroup = guestbookGroup;
+guestbookGroup.traverse(function(o){ o.userData.rootGroup = guestbookGroup; });
+scene.add(guestbookGroup);
+
+var guestMessages = [];
+var GUESTBOOK_STARTERS = ['So glad this exists.', 'Rooting for the 2028 vision.', 'This is what representation in tech should look like.'];
+GUESTBOOK_STARTERS.forEach(function(msg, gi){ addGuestMessage(msg, gi); });
+
+function addGuestMessage(text, seedIndex){
+  var sp = messageSprite(text);
+  var idx = guestMessages.length;
+  sp.userData.orbitPhase = (seedIndex!=null ? seedIndex : idx) * 1.4;
+  sp.position.set(0, 2.1, 0);
+  guestbookGroup.add(sp);
+  guestMessages.push(sp);
+  if(guestMessages.length > 6){
+    var old = guestMessages.shift();
+    guestbookGroup.remove(old);
+  }
+}
+
+/* ---- Reflection benches ---- */
+var benchSpots = [
+  { angle: arcStart + arcSpan*0.22, name:'Sit. Listen.', quote:'Technology built without a community in the room will always speak past it.' },
+  { angle: arcStart + arcSpan*0.78, name:'A Quiet Pause', quote:'A dataset is a form of listening, when you build it with care.' }
+];
+var benches = [];
+benchSpots.forEach(function(spot){
+  var bx = Math.cos(spot.angle)*5.6, bz = Math.sin(spot.angle)*5.6;
+  var g = new THREE.Group();
+  var seat = new THREE.Mesh(new THREE.BoxGeometry(1.3,0.16,0.5), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+  seat.position.y = 0.45;
+  var legGeo = new THREE.CylinderGeometry(0.06,0.06,0.45,8);
+  var legMat = new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6});
+  [[-0.55,0.19],[0.55,0.19],[-0.55,-0.19],[0.55,-0.19]].forEach(function(o){
+    var leg = new THREE.Mesh(legGeo, legMat);
+    leg.position.set(o[0], 0.22, o[1]);
+    g.add(leg);
+  });
+  g.add(seat);
+
+  // a small carved sign beside the bench
+  var post = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.035,0.55,8), new THREE.MeshStandardMaterial({color:COLOR.bronzeDark, metalness:0.5, roughness:0.4}));
+  post.position.set(0.85, 0.28, 0);
+  var plaque = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.26,0.03), new THREE.MeshStandardMaterial({color:COLOR.black, roughness:0.5, emissive:COLOR.aqua, emissiveIntensity:0.06}));
+  plaque.position.set(0.85, 0.58, 0);
+  var signText = labelSprite(spot.name, 420, '#B2FFD6');
+  signText.scale.set(0.62, 0.62*(signText.scale.y/signText.scale.x), 1);
+  signText.position.set(0.85, 0.58, 0.02);
+  g.add(post, plaque, signText);
+
+  g.position.set(bx, 0, bz);
+  g.lookAt(0, 0.6, 0);
+  g.userData.isBench = true;
+  g.userData.quote = spot.quote;
+  g.userData.rootGroup = g;
+  g.traverse(function(o){ o.userData.rootGroup = g; });
+  var hit = new THREE.Mesh(new THREE.BoxGeometry(2.1,0.9,0.9), new THREE.MeshBasicMaterial({visible:false}));
+  hit.position.set(0.3, 0.4, 0);
+  g.add(hit);
+  scene.add(g);
+  benches.push(g);
+});
+
+/* ---- Community map corner (Hartford + East Hartford) ---- */
+var mapGroup = new THREE.Group();
+var mapBase = new THREE.Mesh(new THREE.CylinderGeometry(0.75,0.8,0.16,24), new THREE.MeshStandardMaterial({color:COLOR.black, roughness:0.6}));
+mapBase.position.y = 0.08;
+var mapTop = new THREE.Mesh(new THREE.CircleGeometry(0.72,24), new THREE.MeshStandardMaterial({color:0x14243a, roughness:0.5, emissive:0x0b1a2c, emissiveIntensity:0.4}));
+mapTop.rotation.x = -Math.PI/2; mapTop.position.y = 0.165;
+mapGroup.add(mapBase, mapTop);
+var pinGeo = new THREE.ConeGeometry(0.05,0.16,8);
+var pin1 = new THREE.Mesh(pinGeo, new THREE.MeshStandardMaterial({color:COLOR.blue, emissive:COLOR.blue, emissiveIntensity:0.6}));
+pin1.position.set(-0.22,0.24,0.1); pin1.rotation.x = Math.PI;
+var pin2 = new THREE.Mesh(pinGeo, new THREE.MeshStandardMaterial({color:COLOR.amethyst, emissive:COLOR.amethyst, emissiveIntensity:0.6}));
+pin2.position.set(0.24,0.24,-0.14); pin2.rotation.x = Math.PI;
+mapGroup.add(pin1, pin2);
+var pinLine = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,0.5,6), new THREE.MeshStandardMaterial({color:COLOR.aqua, emissive:COLOR.aqua, emissiveIntensity:0.5}));
+pinLine.position.set(0.01,0.175,-0.02);
+pinLine.rotation.z = Math.PI/2; pinLine.rotation.y = 0.45;
+mapGroup.add(pinLine);
+var mapLabel1 = labelSprite('Hartford', 460, '#B4D6D3'); mapLabel1.position.set(-0.22,0.55,0.1); mapLabel1.scale.set(1.15,1.15*0.32,1);
+var mapLabel2 = labelSprite('East Hartford', 460, '#AA78A6'); mapLabel2.position.set(0.24,0.55,-0.14); mapLabel2.scale.set(1.15,1.15*0.32,1);
+mapGroup.add(mapLabel1, mapLabel2);
+var mapAngle = arcStart + arcSpan*0.36;
+mapGroup.position.set(Math.cos(mapAngle)*6.4, 0, Math.sin(mapAngle)*6.4);
+mapGroup.lookAt(0,0,0);
+mapGroup.userData.isMap = true;
+mapGroup.userData.rootGroup = mapGroup;
+mapGroup.traverse(function(o){ o.userData.rootGroup = mapGroup; });
+var mapHit = new THREE.Mesh(new THREE.CylinderGeometry(1,1,1,10), new THREE.MeshBasicMaterial({visible:false}));
+mapHit.position.y = 0.5;
+mapGroup.add(mapHit);
+scene.add(mapGroup);
+
+/* ---- 2028 Vision hourglass ---- */
+var hourglassGroup = new THREE.Group();
+var glassMat = new THREE.MeshStandardMaterial({ color:COLOR.frost, transparent:true, opacity:0.28, roughness:0.15, metalness:0.1, side:THREE.DoubleSide });
+var topCone = new THREE.Mesh(new THREE.ConeGeometry(0.32,0.5,16,1,true), glassMat);
+topCone.position.y = 0.95;
+var botCone = new THREE.Mesh(new THREE.ConeGeometry(0.32,0.5,16,1,true), glassMat);
+botCone.rotation.x = Math.PI; botCone.position.y = 0.45;
+var frameTop = new THREE.Mesh(new THREE.CylinderGeometry(0.36,0.36,0.05,16), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.6, roughness:0.3}));
+frameTop.position.y = 1.2;
+var frameMid = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,0.05,16), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.6, roughness:0.3}));
+frameMid.position.y = 0.7;
+var frameBot = frameTop.clone(); frameBot.position.y = 0.2;
+hourglassGroup.add(topCone, botCone, frameTop, frameMid, frameBot);
+var sandCount = 60;
+var sandGeo = new THREE.BufferGeometry();
+var sandPos = new Float32Array(sandCount*3);
+for(var si=0; si<sandCount; si++){ sandPos[si*3]=0; sandPos[si*3+1]=-99; sandPos[si*3+2]=0; }
+sandGeo.setAttribute('position', new THREE.BufferAttribute(sandPos,3));
+var sandMat = new THREE.PointsMaterial({ size:0.035, color:COLOR.gold, transparent:true, opacity:0.9 });
+var sandPoints = new THREE.Points(sandGeo, sandMat);
+hourglassGroup.add(sandPoints);
+var vizLabel = numeralSprite('2028');
+vizLabel.scale.set(0.9,0.9,1);
+vizLabel.position.y = 1.55;
+hourglassGroup.add(vizLabel);
+var hgAngle = arcStart + arcSpan*0.64;
+hourglassGroup.position.set(Math.cos(hgAngle)*6.4, 0, Math.sin(hgAngle)*6.4);
+hourglassGroup.lookAt(0,0,0);
+hourglassGroup.userData.isHourglass = true;
+hourglassGroup.userData.rootGroup = hourglassGroup;
+hourglassGroup.userData.clickCount = 0;
+hourglassGroup.traverse(function(o){ o.userData.rootGroup = hourglassGroup; });
+var hgHit = new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,1.4,10), new THREE.MeshBasicMaterial({visible:false}));
+hgHit.position.y = 0.7;
+hourglassGroup.add(hgHit);
+scene.add(hourglassGroup);
+
+var VISION_FACTS = VISION_2028;
+
+/* small milestone timeline in front of the hourglass */
+var milestones = [
+  { year:'2024', label:'First Camp', color:COLOR.terracotta },
+  { year:'2025', label:'ConvoAAVE Built', color:COLOR.bronze },
+  { year:'2026', label:'Bill Introduced', color:COLOR.blue },
+  { year:'2028', label:'National Scale', color:COLOR.amethyst }
+];
+var milestoneGroup = new THREE.Group();
+var milestoneNodes = [];
+var msRadius = 1.55;
+milestones.forEach(function(ms, mi){
+  var ma = -0.55 + mi*(1.1/(milestones.length-1));
+  var mx = Math.sin(ma)*msRadius, mz = -Math.cos(ma)*msRadius*0.35 - 0.9;
+  var my = 0.05 + mi*0.09;
+  var node = new THREE.Mesh(new THREE.SphereGeometry(0.06,12,12), new THREE.MeshStandardMaterial({color:ms.color, emissive:ms.color, emissiveIntensity:0.55, roughness:0.35}));
+  node.position.set(mx, my+0.35, mz);
+  node.userData.isMilestone = true;
+  node.userData.factText = ms.year + '. ' + ms.label + '. ' + (VISION_2028[mi % VISION_2028.length]);
+  node.userData.rootGroup = node;
+  milestoneNodes.push(node);
+  var msHit = new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8), new THREE.MeshBasicMaterial({visible:false}));
+  msHit.position.copy(node.position);
+  msHit.userData.rootGroup = node;
+  milestoneGroup.add(msHit);
+  var yearSprite = numeralSprite(ms.year);
+  yearSprite.scale.set(0.42,0.42,1);
+  yearSprite.position.set(mx, my+0.62, mz);
+  var nameSprite = labelSprite(ms.label, 460, '#ece3d1');
+  nameSprite.scale.set(0.9, 0.9*(nameSprite.scale.y/nameSprite.scale.x), 1);
+  nameSprite.position.set(mx, my+0.2, mz);
+  milestoneGroup.add(node, yearSprite, nameSprite);
+  if(mi>0){
+    var prev = milestones[mi-1].__pos;
+  }
+  milestones[mi].__pos = new THREE.Vector3(mx,my+0.35,mz);
+});
+for(var mli=0; mli<milestones.length-1; mli++){
+  var a = milestones[mli].__pos, b = milestones[mli+1].__pos;
+  var mid = a.clone().lerp(b,0.5);
+  var dist = a.distanceTo(b);
+  var seg = new THREE.Mesh(new THREE.BoxGeometry(dist,0.012,0.012), new THREE.MeshStandardMaterial({color:COLOR.aqua, emissive:COLOR.aqua, emissiveIntensity:0.4}));
+  seg.position.copy(mid);
+  seg.lookAt(b);
+  milestoneGroup.add(seg);
+}
+milestoneGroup.position.copy(hourglassGroup.position);
+milestoneGroup.lookAt(0,milestoneGroup.position.y,0);
+milestoneGroup.rotateY(Math.PI);
+scene.add(milestoneGroup);
+
+/* ---- The Understanding Mirror: before / after ConvoAAVE ---- */
+function chatPanelTexture(understood){
+  var c = document.createElement('canvas'); c.width = 340; c.height = 260;
+  var ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  // bubble
+  ctx.fillStyle = understood ? 'rgba(178,255,214,0.14)' : 'rgba(170,120,166,0.14)';
+  ctx.strokeStyle = understood ? '#B2FFD6' : '#AA78A6';
+  ctx.lineWidth = 3;
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r);
+    ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+  roundRect(28,28,284,150,18);
+  ctx.fill(); ctx.stroke();
+  // little tail
+  ctx.beginPath(); ctx.moveTo(70,178); ctx.lineTo(50,214); ctx.lineTo(96,178); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // text lines representing speech (abstract, not literal words)
+  ctx.strokeStyle = understood ? 'rgba(178,255,214,0.8)' : 'rgba(170,120,166,0.75)';
+  ctx.lineWidth = 6; ctx.lineCap = 'round';
+  var lineY = [64, 86, 108];
+  var widths = understood ? [190,150,120] : [190,150,120];
+  lineY.forEach(function(y,i){
+    ctx.beginPath(); ctx.moveTo(52,y); ctx.lineTo(52+widths[i], y); ctx.stroke();
+  });
+  // response icon
+  ctx.lineWidth = 8; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle = understood ? '#B2FFD6' : '#AA78A6';
+  if(understood){
+    ctx.beginPath(); ctx.moveTo(140,205); ctx.lineTo(165,232); ctx.lineTo(215,180); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.moveTo(145,190); ctx.lineTo(195,232); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(195,190); ctx.lineTo(145,232); ctx.stroke();
+  }
+  ctx.font = '600 15px Jost, sans-serif';
+  ctx.fillStyle = understood ? '#B2FFD6' : '#AA78A6';
+  ctx.textAlign = 'center';
+  ctx.fillText(understood ? 'UNDERSTOOD' : 'MISREAD', 170, 250);
+  return new THREE.CanvasTexture(c);
+}
+
+var mirrorGroup = new THREE.Group();
+var mirrorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.05,0.85,0.06), new THREE.MeshStandardMaterial({color:COLOR.bronze, metalness:0.55, roughness:0.35}));
+mirrorFrame.position.y = 1.55;
+var mirrorScreenTex = chatPanelTexture(false);
+var mirrorScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.92,0.72), new THREE.MeshBasicMaterial({map:mirrorScreenTex, transparent:true}));
+mirrorScreen.position.set(0,1.55,0.035);
+var mirrorStandPost = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,1.1,10), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+mirrorStandPost.position.y = 0.55;
+var mirrorBase = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.36,0.14,16), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6}));
+mirrorBase.position.y = 0.07;
+var mirrorTitle = labelSprite('Before & After', 560, '#ece3d1');
+mirrorTitle.position.set(0, 2.15, 0);
+mirrorTitle.scale.set(1.5, 1.5*(mirrorTitle.scale.y/mirrorTitle.scale.x), 1);
+mirrorGroup.add(mirrorFrame, mirrorScreen, mirrorStandPost, mirrorBase, mirrorTitle);
+var mirrorAngle = arcStart + arcSpan*0.5 + 0.5;
+var mirrorRadius = 6.0;
+mirrorGroup.position.set(Math.cos(mirrorAngle)*mirrorRadius, 0, Math.sin(mirrorAngle)*mirrorRadius);
+mirrorGroup.lookAt(0,1.55,0);
+mirrorGroup.userData.isMirror = true;
+mirrorGroup.userData.rootGroup = mirrorGroup;
+mirrorGroup.userData.state = false;
+mirrorGroup.userData.screen = mirrorScreen;
+mirrorGroup.traverse(function(o){ o.userData.rootGroup = mirrorGroup; });
+var mirrorHit = new THREE.Mesh(new THREE.BoxGeometry(1.3,2.3,0.6), new THREE.MeshBasicMaterial({visible:false}));
+mirrorHit.position.y = 1.1;
+mirrorGroup.add(mirrorHit);
+scene.add(mirrorGroup);
+
+var MIRROR_TOASTS = {
+  before: 'Before ConvoAAVE, general purpose chatbots often flagged everyday AAVE as an error to correct rather than language to understand.',
+  after: 'After training with ConvoAAVE, the same everyday speech is recognized as intended, not flattened into something else.'
+};
+
+/* ---- Testimony podium, near the policy pedestal ---- */
+var podiumGroup = new THREE.Group();
+var podiumBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.3,1.0,12), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
+podiumBase.position.y = 0.5;
+var podiumTop = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.08,0.4), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.55}));
+podiumTop.rotation.x = -0.25;
+podiumTop.position.set(0,1.02,0.05);
+var sealRing = new THREE.Mesh(new THREE.TorusGeometry(0.16,0.02,10,24), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.6, roughness:0.3}));
+sealRing.position.set(0,0.75,0.31);
+var sealCenter = new THREE.Mesh(new THREE.CircleGeometry(0.12,20), new THREE.MeshStandardMaterial({color:COLOR.blue, emissive:COLOR.blue, emissiveIntensity:0.35, roughness:0.4}));
+sealCenter.position.set(0,0.75,0.315);
+for(var wing=-1; wing<=1; wing+=2){
+  var feather = new THREE.Mesh(new THREE.SphereGeometry(0.03,8,8), new THREE.MeshStandardMaterial({color:COLOR.gold, metalness:0.5, roughness:0.35}));
+  feather.scale.set(1.8,0.5,0.6);
+  feather.position.set(wing*0.18,0.75,0.3);
+  podiumGroup.add(feather);
+}
+var flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,1.5,6), new THREE.MeshStandardMaterial({color:COLOR.bronzeDark, roughness:0.5}));
+flagPole.position.set(-0.5,0.75,-0.15);
+var flagCloth = new THREE.Mesh(new THREE.PlaneGeometry(0.32,0.22), new THREE.MeshStandardMaterial({color:COLOR.amethyst, side:THREE.DoubleSide, roughness:0.6, emissive:COLOR.amethyst, emissiveIntensity:0.15}));
+flagCloth.position.set(-0.34,1.35,-0.15);
+podiumGroup.add(podiumBase, podiumTop, sealRing, sealCenter, flagPole, flagCloth);
+var podiumLabel = labelSprite('Testimony', 520, '#B4D6D3');
+podiumLabel.position.set(0,1.7,0);
+podiumLabel.scale.set(1.2, 1.2*(podiumLabel.scale.y/podiumLabel.scale.x), 1);
+podiumGroup.add(podiumLabel);
+var policyPedestal = pedestals[3];
+var podiumOffsetAngle = Math.atan2(policyPedestal.position.z, policyPedestal.position.x) + 0.22;
+var podiumRadius = 7.6;
+podiumGroup.position.set(Math.cos(podiumOffsetAngle)*podiumRadius, 0, Math.sin(podiumOffsetAngle)*podiumRadius);
+podiumGroup.lookAt(0,0.8,0);
+podiumGroup.userData.isPodium = true;
+podiumGroup.userData.rootGroup = podiumGroup;
+podiumGroup.traverse(function(o){ o.userData.rootGroup = podiumGroup; });
+var podiumHit = new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,2,10), new THREE.MeshBasicMaterial({visible:false}));
+podiumHit.position.y = 0.8;
+podiumGroup.add(podiumHit);
+scene.add(podiumGroup);
+
+var PODIUM_FACTS = [
+  'Research briefs written with mentorship from the Congressional Research Service laid the groundwork for a formal grant proposal.',
+  'The proposal, introduced by Congressman John Larson\u2019s office in 2026, would fund AI education, teacher training, and programming for underserved schools.',
+  'Student researchers are now preparing to testify before Congress themselves, in support of a bipartisan bill built from their own findings.'
+];
+
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
@@ -1070,7 +1574,35 @@ function spawnConfetti(pos){
 /* =========================================================================
    Controls / State
    ========================================================================= */
-var controls = new THREE.OrbitControls(camera, renderer.domElement);
+var controls = new (THREE.OrbitControls || function(cam, dom){
+  // minimal fallback drag-to-look controls if the CDN failed to deliver OrbitControls
+  this.object = cam; this.domElement = dom; this.target = new THREE.Vector3();
+  this.enabled = true; this.enableDamping = true; this.dampingFactor = 0.08;
+  this.enablePan = false; this.minDistance = 4; this.maxDistance = 15;
+  this.minPolarAngle = 0.4; this.maxPolarAngle = 1.5; this.rotateSpeed = 0.5;
+  var self = this, dragging = false, lastX=0, lastY=0, theta=0, phi=1.2, dist=9;
+  function onDown(e){ dragging = true; var p = e.touches?e.touches[0]:e; lastX=p.clientX; lastY=p.clientY; }
+  function onUp(){ dragging = false; }
+  function onMove(e){
+    if(!dragging || !self.enabled) return;
+    var p = e.touches?e.touches[0]:e;
+    theta -= (p.clientX-lastX)*0.005*self.rotateSpeed*2;
+    phi   -= (p.clientY-lastY)*0.005*self.rotateSpeed*2;
+    phi = Math.max(self.minPolarAngle, Math.min(self.maxPolarAngle, phi));
+    lastX=p.clientX; lastY=p.clientY;
+  }
+  dom.addEventListener('pointerdown', onDown);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointermove', onMove);
+  this.update = function(){
+    if(!this.enabled) return;
+    this.object.position.x = this.target.x + dist*Math.sin(phi)*Math.sin(theta);
+    this.object.position.y = this.target.y + dist*Math.cos(phi);
+    this.object.position.z = this.target.z + dist*Math.sin(phi)*Math.cos(theta);
+    this.object.lookAt(this.target);
+  };
+})(camera, renderer.domElement);
+if(!THREE.OrbitControls) console.warn('Machina Mundi: OrbitControls did not load from CDN, using a lightweight fallback for look controls.');
 controls.enabled = false;
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
@@ -1102,7 +1634,7 @@ function findRoot(obj){
   var o = obj;
   while(o){
     if(o.userData && o.userData.rootGroup) return o.userData.rootGroup;
-    if(o.userData && (o.userData.isDoor || o.userData.isSecret || o.userData.isBall || o.userData.isCore || o.userData.isTorch)) return o;
+    if(o.userData && (o.userData.isDoor || o.userData.isSecret || o.userData.isBall || o.userData.isCore || o.userData.isTorch || o.userData.isVoice || o.userData.isNiche || o.userData.isGuestbook || o.userData.isBench || o.userData.isMap || o.userData.isHourglass || o.userData.isMilestone || o.userData.isMirror || o.userData.isPodium)) return o;
     o = o.parent;
   }
   return null;
@@ -1120,7 +1652,9 @@ function onPointerDown(e){
 
   if(STATE !== 'explore') return;
 
-  var targets = pedestals.concat([secretTile, armillary]).concat(torches);
+  var targets = pedestals.concat([secretTile, armillary]).concat(torches).concat(voicesGroup.children)
+    .concat(niches).concat([guestbookGroup]).concat(benches).concat([mapGroup, hourglassGroup]).concat(milestoneGroup.children)
+    .concat([mirrorGroup, podiumGroup]);
   var intersects = raycaster.intersectObjects(targets, true);
   if(!intersects.length) return;
   var root = findRoot(intersects[0].object);
@@ -1138,6 +1672,51 @@ function onPointerDown(e){
   }
   if(root.userData && root.userData.isTorch){
     handleTorchClick(root);
+    return;
+  }
+  if(root.userData && root.userData.isVoice){
+    root.scale.y = 1.6; root.userData.pulse = 1;
+    showToast(VOICE_TOASTS[Math.floor(Math.random()*VOICE_TOASTS.length)]);
+    return;
+  }
+  if(root.userData && root.userData.isNiche){
+    root.userData.orb.scale.setScalar(1.4);
+    showToast(FACTS[root.userData.factIndex]);
+    return;
+  }
+  if(root.userData && root.userData.isGuestbook){
+    openGuestbook();
+    return;
+  }
+  if(root.userData && root.userData.isBench){
+    sitAtBench(root);
+    return;
+  }
+  if(root.userData && root.userData.isMap){
+    showToast('Two neighboring cities, one shared program. Hartford and East Hartford, served together.');
+    return;
+  }
+  if(root.userData && root.userData.isMilestone){
+    root.scale.setScalar(1.6); root.userData.pulse = 1;
+    showToast(root.userData.factText);
+    return;
+  }
+  if(root.userData && root.userData.isMirror){
+    root.userData.state = !root.userData.state;
+    var newTex = chatPanelTexture(root.userData.state);
+    root.userData.screen.material.map = newTex;
+    root.userData.screen.material.needsUpdate = true;
+    showToast(root.userData.state ? MIRROR_TOASTS.after : MIRROR_TOASTS.before);
+    return;
+  }
+  if(root.userData && root.userData.isPodium){
+    root.userData.clickCount = (root.userData.clickCount||0)+1;
+    showToast(PODIUM_FACTS[(root.userData.clickCount-1) % PODIUM_FACTS.length]);
+    return;
+  }
+  if(root.userData && root.userData.isHourglass){
+    showToast(VISION_2028[hourglassGroup.userData.clickCount % VISION_2028.length]);
+    hourglassGroup.userData.clickCount = (hourglassGroup.userData.clickCount || 0) + 1;
     return;
   }
   // ball click (search deeper since ball is nested under a pedestal icon group)
@@ -1229,15 +1808,34 @@ function showToast(msg){
 }
 
 /* -------------------------------------------------------------------------
+   Guestbook modal
+   ------------------------------------------------------------------------- */
+var guestbookModal = document.getElementById('guestbook-modal');
+var guestbookInput = document.getElementById('guestbook-input');
+function openGuestbook(){
+  guestbookModal.classList.add('open');
+  guestbookInput.value = '';
+  setTimeout(function(){ guestbookInput.focus(); }, 100);
+}
+function closeGuestbook(){ guestbookModal.classList.remove('open'); }
+document.getElementById('guestbook-cancel').addEventListener('click', closeGuestbook);
+document.getElementById('guestbook-submit').addEventListener('click', function(){
+  var val = guestbookInput.value.trim();
+  if(val){
+    addGuestMessage(val);
+    showToast('Thank you. Your voice has been added.');
+  }
+  closeGuestbook();
+});
+guestbookModal.addEventListener('click', function(e){ if(e.target === guestbookModal) closeGuestbook(); });
+
+/* -------------------------------------------------------------------------
    Story navigation (arrow keys + on-screen arrows)
    ------------------------------------------------------------------------- */
 var currentStopIndex = -1;
 var cameraFly = null;
 
-function flyToStop(idx){
-  var p = pedestals[idx].position.clone();
-  var camTo = new THREE.Vector3(p.x*0.42, 3.1, p.z*0.42);
-  var lookTo = new THREE.Vector3(p.x, 1.9, p.z);
+function flyTo(camTo, lookTo){
   cameraFly = {
     from: camera.position.clone(),
     to: camTo,
@@ -1247,6 +1845,28 @@ function flyToStop(idx){
     duration: 1.1
   };
   controls.enabled = false;
+}
+
+function flyToStop(idx){
+  var p = pedestals[idx].position.clone();
+  var camTo = new THREE.Vector3(p.x*0.42, 3.1, p.z*0.42);
+  var lookTo = new THREE.Vector3(p.x, 1.9, p.z);
+  flyTo(camTo, lookTo);
+}
+
+var quoteEl = document.getElementById('quote-overlay');
+var quoteTextEl = document.getElementById('quote-text');
+function sitAtBench(bench){
+  var p = bench.position.clone();
+  var dir = p.clone().normalize().multiplyScalar(1.4);
+  var camTo = new THREE.Vector3(p.x + dir.x, 1.55, p.z + dir.z);
+  var lookTo = new THREE.Vector3(0, 2.2, 0);
+  flyTo(camTo, lookTo);
+  setTimeout(function(){
+    quoteTextEl.textContent = '\u201C' + bench.userData.quote + '\u201D';
+    quoteEl.classList.add('show');
+    setTimeout(function(){ quoteEl.classList.remove('show'); }, 4600);
+  }, 1200);
 }
 
 function setActiveStop(idx){
@@ -1336,6 +1956,75 @@ function animate(){
     }
   });
 
+  // podium flag wave, mirror frame glow
+  flagCloth.rotation.y = Math.sin(t*2.2)*0.15;
+  mirrorFrame.material.emissive = new THREE.Color(mirrorGroup.userData.state ? COLOR.aqua : COLOR.amethyst);
+  mirrorFrame.material.emissiveIntensity = 0.12 + Math.sin(t*1.5)*0.05;
+
+  // milestone timeline settle-back after click
+  milestoneNodes.forEach(function(node, ni){
+    node.material.emissiveIntensity = 0.5 + Math.sin(t*1.3+ni*1.5)*0.15;
+    if(node.userData.pulse){
+      node.scale.multiplyScalar(1 - dt*3.5);
+      if(node.scale.x < 1.02){ node.scale.setScalar(1); node.userData.pulse = 0; }
+    }
+  });
+
+  // fact niches: settle back after being pressed, gentle idle glow
+  niches.forEach(function(n, ni){
+    var orb = n.userData.orb;
+    orb.material.emissiveIntensity = 0.5 + Math.sin(t*1.2+ni)*0.15;
+    if(orb.scale.x > 1.001){ orb.scale.multiplyScalar(1 - dt*3); }
+    else orb.scale.setScalar(1);
+  });
+
+  // guestbook messages drift in a slow ring above the book
+  guestMessages.forEach(function(sp, gi){
+    var a = t*0.35 + sp.userData.orbitPhase;
+    sp.position.set(Math.sin(a)*0.05, 2.1 + Math.sin(t*0.6+gi)*0.06, 0);
+    sp.material.opacity = 0.55 + Math.sin(t*0.8+gi)*0.25;
+  });
+
+  // hourglass falling sand
+  var sPos = sandGeo.attributes.position;
+  for(var sj=0; sj<sandCount; sj++){
+    var cur = sPos.getY(sj);
+    if(cur < 0.25 || cur > 1.15){
+      sPos.setXYZ(sj, (Math.random()-0.5)*0.12, 1.12, (Math.random()-0.5)*0.12);
+    } else {
+      sPos.setY(sj, cur - dt*0.35);
+      sPos.setX(sj, sPos.getX(sj)*0.99);
+      sPos.setZ(sj, sPos.getZ(sj)*0.99);
+    }
+  }
+  sPos.needsUpdate = true;
+  hourglassGroup.rotation.y += dt*0.05;
+
+  // map pins gentle pulse
+  [pin1, pin2].forEach(function(pin, pi){
+    pin.material.emissiveIntensity = 0.5 + Math.sin(t*1.5+pi*2)*0.25;
+  });
+
+  // wall of voices: gentle pulse, plus a settle-back after being clicked
+  voicesGroup.children.forEach(function(pillar){
+    var glow = 0.4 + Math.sin(t*1.4 + pillar.userData.phase)*0.22;
+    pillar.material.emissiveIntensity = glow;
+    if(pillar.userData.pulse){
+      pillar.scale.y += (1 - pillar.scale.y)*dt*4;
+      if(Math.abs(pillar.scale.y-1) < 0.01){ pillar.scale.y = 1; pillar.userData.pulse = 0; }
+    }
+  });
+  var corePos = new THREE.Vector3();
+  armillary.getWorldPosition(corePos);
+  voiceWisps.forEach(function(w){
+    w.userData.t += dt*w.userData.speed;
+    if(w.userData.t >= 1){ w.userData.t = 0; }
+    var lt = w.userData.t;
+    w.position.lerpVectors(w.userData.origin, corePos, lt);
+    w.position.y += Math.sin(lt*Math.PI)*0.6;
+    w.material.opacity = Math.sin(lt*Math.PI)*0.85;
+  });
+
   // dust motes drift upward, wrap
   var posAttr = moteGeo.attributes.position;
   for(var mi=0; mi<moteCount; mi++){
@@ -1368,6 +2057,10 @@ function animate(){
       icon.userData.kid2.rotation.y = Math.sin(t*1.2+1.5)*0.3;
       icon.userData.kid1.position.y = Math.abs(Math.sin(t*2.4))*0.04;
       icon.userData.kid2.position.y = Math.abs(Math.sin(t*2.4+0.8))*0.04;
+      if(icon.userData.kid3){
+        icon.userData.kid3.rotation.y = Math.sin(t*1.2+2.8)*0.3;
+        icon.userData.kid3.position.y = Math.abs(Math.sin(t*2.4+1.6))*0.04;
+      }
     }
     if(icon.userData.words){
       icon.userData.words.children.forEach(function(w, wi){
