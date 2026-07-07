@@ -1306,18 +1306,20 @@ nicheAngles.forEach(function(ang, ni){
    Filenames containing "ymca" get a larger frame.
    ------------------------------------------------------------------- */
 var GALLERY = [
-  'CongressmanMeeting.png','ConvoAAVE.png','MachinaMundiLogo.png','MainPrinecton.jpg','MainYMCA.png',
-  'News.jpg','PrincetonWinners.jpg','PrinectionSpeech1.jpg','Prinecton.jpg','PrinectonSpeech.JPG',
-  'UpliftGroup.png','UpliftGroups.png','UpliftHartford.png','UpliftWelcomeSign.png',
-  'YMCA1.png','YMCAClass.png','YMCAClassroom.png','anil.jpg','basanth.jpg',
-  'partner-codeninjas.jpg','partner-community.png','partner-congress.png','partner-mayor.jpg',
-  'partner-schools.png','partner-ymca.jpg','student1.jpeg','student1.jpg','student10.png',
-  'student12.jpg','student13.jpg','student2.png','student4.png','student6.jpg','student7.jpg','student8.png'
+  'CongressmanMeeting.png','ConvoAAVE.png','MachinaMundiLogo.jpg','MainPrinecton.jpg','MainYMCA.jpg',
+  'News.jpg','PrincetonWinners.jpg','PrinectionSpeech1.jpg','Prinecton.jpg','PrinectonSpeech.jpg',
+  'UpliftGroup.jpg','UpliftGroups.jpg','UpliftHartford.jpg','UpliftWelcomeSign.jpg',
+  'YMCA1.jpg','YMCAClass.jpg','YMCAClassroom.jpg','anil.jpg','basanth.jpg',
+  'partner-codeninjas.jpg','partner-community.jpg','partner-congress.jpg','partner-mayor.jpg',
+  'partner-schools.jpg','partner-ymca.jpg','student1.jpeg','student1.jpg','student10.png',
+  'student12.jpg','student13.jpg','student2.png','student4.png','student6.jpg','student7.jpg','student8.jpg'
 ];
+// GALLERY points at media-web/, a pre-compressed/resized copy of media/ (97.6MB -> 3.0MB)
+// generated for fast load times; the originals in media/ are untouched.
 
 var pfLoader = new THREE.TextureLoader();
 function addPictureFrame(file, angle, y, baseSize, isBig, ni){
-  pfLoader.load('media/' + file, function(tex){
+  pfLoader.load('media-web/' + file, function(tex){
     tex.encoding = THREE.sRGBEncoding;
     tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
     var iw = (tex.image && tex.image.width) || 4, ih = (tex.image && tex.image.height) || 3;
