@@ -1300,6 +1300,76 @@ nicheAngles.forEach(function(ang, ni){
   niches.push(g);
 });
 
+/* ---------------------------------------------------------------------
+   Photo gallery — every image in media/ hung as a framed picture,
+   scattered around the rotunda wall at varying heights and sizes.
+   Filenames containing "ymca" get a larger frame.
+   ------------------------------------------------------------------- */
+var GALLERY = [
+  'CongressmanMeeting.png','ConvoAAVE.png','MachinaMundiLogo.png','MainPrinecton.jpg','MainYMCA.png',
+  'News.jpg','PrincetonWinners.jpg','PrinectionSpeech1.jpg','Prinecton.jpg','PrinectonSpeech.JPG',
+  'UpliftGroup.png','UpliftGroups.png','UpliftHartford.png','UpliftWelcomeSign.png',
+  'YMCA1.png','YMCAClass.png','YMCAClassroom.png','anil.jpg','basanth.jpg',
+  'partner-codeninjas.jpg','partner-community.png','partner-congress.png','partner-mayor.jpg',
+  'partner-schools.png','partner-ymca.jpg','student1.jpeg','student1.jpg','student10.png',
+  'student12.jpg','student13.jpg','student2.png','student4.png','student6.jpg','student7.jpg','student8.png'
+];
+
+var pfLoader = new THREE.TextureLoader();
+function addPictureFrame(file, angle, y, baseSize, isBig, ni){
+  pfLoader.load('media/' + file, function(tex){
+    tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    var iw = (tex.image && tex.image.width) || 4, ih = (tex.image && tex.image.height) || 3;
+    var aspect = iw / ih;
+    var h = baseSize * (isBig ? 1.45 : 1);
+    var w = h * aspect;
+    if(w > h * 2.2){ w = h * 2.2; }
+    if(w < h * 0.45){ w = h * 0.45; }
+
+    var group = new THREE.Group();
+    var glowColor = BRAND[ni % BRAND.length];
+    var backEdge = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.22, h + 0.22, 0.02),
+      new THREE.MeshStandardMaterial({ color:glowColor, emissive:glowColor, emissiveIntensity:0.5, metalness:0.4, roughness:0.3 })
+    );
+    backEdge.position.z = -0.025;
+    var frame = new THREE.Mesh(
+      new THREE.BoxGeometry(w + 0.14, h + 0.14, 0.06),
+      new THREE.MeshStandardMaterial({ color:COLOR.blackSoft, metalness:0.55, roughness:0.35 })
+    );
+    var photo = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, h),
+      new THREE.MeshBasicMaterial({ map:tex })
+    );
+    photo.position.z = 0.035;
+    group.add(backEdge, frame, photo);
+
+    var nx = Math.cos(angle) * (ROOM_R - 0.28), nz = Math.sin(angle) * (ROOM_R - 0.28);
+    group.position.set(nx, y, nz);
+    group.lookAt(0, y, 0);
+    group.userData.isPicture = true;
+    scene.add(group);
+  }, undefined, function(err){
+    console.warn('Machina Mundi: failed to load gallery image', file, err);
+  });
+}
+
+(function buildGallery(){
+  var N = GALLERY.length;
+  var startAngle = DOOR_ANGLE + GAP * 1.6;
+  var totalArc = Math.PI * 2 - GAP * 3.2;
+  var step = totalArc / N;
+  var bandY = [2.25, 4.1, 5.95];
+  GALLERY.forEach(function(file, i){
+    var ang = startAngle + i * step + (Math.random() - 0.5) * step * 0.4;
+    var y = bandY[i % bandY.length] + (Math.random() - 0.5) * 0.5;
+    var isBig = /ymca/i.test(file);
+    var baseSize = 0.85 + Math.random() * 0.9;
+    addPictureFrame(file, ang, y, baseSize, isBig, i);
+  });
+})();
+
 /* ---- Guestbook near the entrance ---- */
 var guestbookGroup = new THREE.Group();
 var gbStand = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.4,1.0,14), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
