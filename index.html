@@ -1241,6 +1241,94 @@ nicheAngles.forEach(function(ang, ni){
   niches.push(g);
 });
 
+/* ---------------------------------------------------------------------
+   Photo gallery — hung as framed pictures scattered around the rotunda
+   wall at varying heights and sizes. Filenames containing "ymca" get a
+   larger frame.
+
+   This used to be 3 lit MeshStandardMaterial box/plane meshes per photo
+   (a glow edge + frame + photo = 30 meshes for 10 photos), each shaded
+   against every light in the scene, plus a THREE.TextureLoader texture
+   per photo. That was the actual real-time cost, independent of file
+   size: 20 extra PBR-lit meshes and 30 draw calls just to hang pictures.
+
+   Replaced with one THREE.Sprite per photo: the frame border and glow
+   edge are baked into the same canvas as the photo (one unlit, mipmap-
+   free CanvasTexture per photo), so each picture is a single unlit draw
+   call that always faces the camera. 10 photos = 10 cheap draws instead
+   of 30 lit ones, with no per-light shading cost at all.
+   ------------------------------------------------------------------- */
+// Trimmed to a curated set of 10 (from 34) to cut load and render time:
+// fewer texture downloads/decodes and fewer draw calls for the gallery.
+var GALLERY = [
+  'MachinaMundiLogo.jpg','CongressmanMeeting.png','ConvoAAVE.png','MainPrinecton.jpg',
+  'MainYMCA.jpg','News.jpg','UpliftGroup.jpg','YMCAClass.jpg','partner-ymca.jpg','student1.jpg'
+];
+// GALLERY points at media-web/, a pre-compressed/resized copy of media/ (97.6MB -> 3.0MB)
+// generated for fast load times; the originals in media/ are untouched.
+
+function hexColor(n){ return '#' + n.toString(16).padStart(6, '0'); }
+
+function addPictureFrame(file, angle, y, baseSize, isBig, ni){
+  var img = new Image();
+  img.onload = function(){
+    var aspect = img.naturalWidth / (img.naturalHeight || 1);
+    var h = baseSize * (isBig ? 1.45 : 1);
+    var w = h * aspect;
+    if(w > h * 2.2){ w = h * 2.2; }
+    if(w < h * 0.45){ w = h * 0.45; }
+
+    // Bake photo + frame + glow edge into one canvas at a fixed px-per-world-unit
+    // scale, independent of the source image resolution, so texture memory
+    // stays small and predictable no matter how big the source photo is.
+    var PPU = 200;
+    var glow = 0.06, border = 0.14;
+    var innerW = Math.round(w * PPU), innerH = Math.round(h * PPU);
+    var borderPx = Math.round(border * PPU), glowPx = Math.round(glow * PPU);
+    var canvas = document.createElement('canvas');
+    canvas.width = innerW + (borderPx + glowPx) * 2;
+    canvas.height = innerH + (borderPx + glowPx) * 2;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = hexColor(BRAND[ni % BRAND.length]);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = hexColor(COLOR.blackSoft);
+    ctx.fillRect(glowPx, glowPx, canvas.width - glowPx * 2, canvas.height - glowPx * 2);
+    ctx.drawImage(img, glowPx + borderPx, glowPx + borderPx, innerW, innerH);
+
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.encoding = THREE.sRGBEncoding;
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+
+    var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:false }));
+    sprite.scale.set(canvas.width / PPU, canvas.height / PPU, 1);
+    var nx = Math.cos(angle) * (ROOM_R - 0.28), nz = Math.sin(angle) * (ROOM_R - 0.28);
+    sprite.position.set(nx, y, nz);
+    sprite.userData.isPicture = true;
+    scene.add(sprite);
+  };
+  img.onerror = function(){
+    console.warn('Machina Mundi: failed to load gallery image', file);
+  };
+  img.src = 'media-web/' + file;
+}
+
+(function buildGallery(){
+  var N = GALLERY.length;
+  var startAngle = DOOR_ANGLE + GAP * 1.6;
+  var totalArc = Math.PI * 2 - GAP * 3.2;
+  var step = totalArc / N;
+  var bandY = [2.25, 4.1, 5.95];
+  GALLERY.forEach(function(file, i){
+    var ang = startAngle + i * step + (Math.random() - 0.5) * step * 0.4;
+    var y = bandY[i % bandY.length] + (Math.random() - 0.5) * 0.5;
+    var isBig = /ymca/i.test(file);
+    var baseSize = 0.85 + Math.random() * 0.9;
+    addPictureFrame(file, ang, y, baseSize, isBig, i);
+  });
+})();
+
 /* ---- Guestbook near the entrance ---- */
 var guestbookGroup = new THREE.Group();
 var gbStand = new THREE.Mesh(new THREE.CylinderGeometry(0.32,0.4,1.0,14), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6}));
