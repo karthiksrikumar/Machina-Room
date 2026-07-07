@@ -15,10 +15,10 @@
     --c-marble-dim:#8fa2b3;
     --c-terracotta:#7c5cff;
     --c-terracotta-dim:#5b3fd6;
-    --c-bronze:#00e5ff;
-    --c-bronze-dark:#0891a8;
+    --c-bronze:#1E90FF;
+    --c-bronze-dark:#1467bf;
     --c-red:#ff3d6e;
-    --c-gold:#9dfaff;
+    --c-gold:#9dc4ff;
     --c-blue:#1E90FF;
     --c-frost:#D7FDF0;
     --c-aqua:#B2FFD6;
@@ -48,7 +48,7 @@
   #loading.hidden{ opacity:0; pointer-events:none; }
   .ring-spin{
     width:56px; height:56px; border-radius:50%;
-    border:1.5px solid rgba(0,229,255,0.18);
+    border:1.5px solid rgba(30,144,255,0.18);
     border-top-color: var(--c-gold);
     border-right-color: var(--c-bronze);
     animation: spin 1.4s linear infinite;
@@ -93,7 +93,7 @@
     font-size:clamp(28px, 5vw, 54px); letter-spacing:0.28em; font-weight:500;
     text-transform:uppercase; text-align:center; padding:0 20px;
     opacity:0; transform: translateY(14px) scale(0.98);
-    text-shadow: 0 0 40px rgba(0,229,255,0.35);
+    text-shadow: 0 0 40px rgba(30,144,255,0.35);
   }
   #welcome-text.in{
     opacity:1; transform:translateY(0) scale(1);
@@ -113,7 +113,7 @@
   #hud.show{ opacity:1; }
   #hud .pill{
     font-size:11.5px; letter-spacing:0.12em; color:var(--c-marble-dim);
-    background:rgba(5,7,10,0.5); border:1px solid rgba(0,229,255,0.25);
+    background:rgba(5,7,10,0.5); border:1px solid rgba(30,144,255,0.25);
     padding:9px 20px; border-radius:100px; backdrop-filter: blur(6px);
     font-weight:300;
   }
@@ -199,7 +199,7 @@
     position:fixed; top:0; right:0; height:100%;
     width:min(400px, 92vw);
     background: linear-gradient(160deg, rgba(9,13,20,0.94), rgba(5,7,10,0.96));
-    border-left: 1px solid rgba(0,229,255,0.3);
+    border-left: 1px solid rgba(30,144,255,0.3);
     box-shadow: -30px 0 60px rgba(0,0,0,0.5);
     z-index:50;
     transform: translateX(100%);
@@ -232,22 +232,22 @@
   #panel-close{
     position:absolute; top:26px; right:28px;
     width:38px; height:38px; border-radius:50%;
-    border:1px solid rgba(0,229,255,0.35); background:transparent;
+    border:1px solid rgba(30,144,255,0.35); background:transparent;
     color:var(--c-marble-dim); font-size:18px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     transition: all 0.3s ease;
   }
-  #panel-close:hover{ background:rgba(0,229,255,0.15); color:var(--c-marble); transform:rotate(90deg); }
+  #panel-close:hover{ background:rgba(30,144,255,0.15); color:var(--c-marble); transform:rotate(90deg); }
   #panel-index{
     margin-top:auto; padding-top:28px; font-size:11px; letter-spacing:0.15em;
-    color:var(--c-bronze-dark); border-top:1px solid rgba(0,229,255,0.2);
+    color:var(--c-bronze-dark); border-top:1px solid rgba(30,144,255,0.2);
   }
 
   /* ---------- Toast ---------- */
   #toast{
     position:fixed; left:50%; bottom:12%; z-index:70;
     transform: translate(-50%, 12px); 
-    background:rgba(11,9,8,0.88); border:1px solid rgba(0,229,255,0.4);
+    background:rgba(11,9,8,0.88); border:1px solid rgba(30,144,255,0.4);
     color:var(--c-marble); font-size:13px; letter-spacing:0.03em; font-weight:300;
     padding:13px 24px; border-radius:8px; max-width:min(380px,86vw); text-align:center;
     opacity:0; pointer-events:none; transition: all 0.6s ease; line-height:1.5;
@@ -255,7 +255,7 @@
   #toast.show{ opacity:1; transform:translate(-50%, 0); }
 
   ::-webkit-scrollbar{ width:6px; }
-  ::-webkit-scrollbar-thumb{ background:rgba(0,229,255,0.3); border-radius:3px; }
+  ::-webkit-scrollbar-thumb{ background:rgba(30,144,255,0.3); border-radius:3px; }
 
   /* ---------- Guestbook modal ---------- */
   #guestbook-modal{
@@ -386,17 +386,19 @@ var COLOR = {
   marbleDim: 0x8fa2b3,
   terracotta: 0x7c5cff,
   terracottaDim: 0x5b3fd6,
-  bronze: 0x00c8e0,
-  bronzeDark: 0x0a7f96,
+  bronze: 0x1E90FF,
+  bronzeDark: 0x1467bf,
   red: 0xff3d6e,
-  gold: 0x9dfaff,
+  gold: 0x9dc4ff,
   blue: 0x1E90FF,
   frost: 0xD7FDF0,
   aqua: 0xB2FFD6,
   lightblue: 0xB4D6D3,
   amethyst: 0xAA78A6,
 };
-var BRAND = [COLOR.blue, COLOR.aqua, COLOR.lightblue, COLOR.amethyst, COLOR.frost];
+// Dodger Blue as the majority accent, the other four brand tones as
+// minority highlights, matching the approved brand palette weighting.
+var BRAND = [COLOR.blue, COLOR.blue, COLOR.aqua, COLOR.blue, COLOR.amethyst, COLOR.blue, COLOR.frost, COLOR.blue, COLOR.lightblue];
 var SKIN_TONES = [0xf6dfc4, 0xe0ac69, 0xc98a5e, 0xa9673a, 0x8d5524, 0x6b4226, 0x4a2b17];
 
 var ROOM_R = 15;
@@ -563,7 +565,7 @@ function mosaicFloorTexture(size){
   var baseGrad = ctx.createRadialGradient(cx,cy,0,cx,cy,R);
   baseGrad.addColorStop(0,'#0f1620'); baseGrad.addColorStop(0.6,'#0a0e14'); baseGrad.addColorStop(1,'#05070a');
   ctx.fillStyle = baseGrad; ctx.fillRect(0,0,size,size);
-  var ringPalette = ['#1E90FF','#B2FFD6','#AA78A6','#B4D6D3'];
+  var ringPalette = ['#1E90FF','#1E90FF','#B2FFD6','#1E90FF','#AA78A6','#1E90FF','#B4D6D3'];
   // concentric thin glowing rings
   var rings = 22;
   for(var i=rings;i>0;i--){
@@ -581,8 +583,8 @@ function mosaicFloorTexture(size){
   for(var s2=0;s2<seg;s2++){
     var ang = (s2/seg)*Math.PI*2;
     var grad = ctx.createLinearGradient(cx,cy,cx+Math.cos(ang)*R,cy+Math.sin(ang)*R);
-    grad.addColorStop(0,'rgba(0,229,255,0.35)');
-    grad.addColorStop(1,'rgba(0,229,255,0)');
+    grad.addColorStop(0,'rgba(30,144,255,0.35)');
+    grad.addColorStop(1,'rgba(30,144,255,0)');
     ctx.strokeStyle = grad; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(ang)*R*0.1, cy + Math.sin(ang)*R*0.1);
@@ -1658,6 +1660,124 @@ var PODIUM_FACTS = [
   'Student researchers are now preparing to testify before Congress themselves, in support of a bipartisan bill built from their own findings.'
 ];
 
+/* -------------------------------------------------------------------------
+   Impact Counter \u2014 a plaque you can click through to see the program's
+   numbers, one card at a time. Built the same cheap way as the photo
+   gallery: a single unlit CanvasTexture sprite, only re-baked on click
+   (not per frame), so it costs nothing at render time.
+   ------------------------------------------------------------------------- */
+var STAT_CARDS = [
+  { value:'900+', label:'Students Trained', detail:'More than nine hundred students have gone through AI Pathways Camp so far, moving from users of technology to builders of it.' },
+  { value:'50,000+', label:'Words in ConvoAAVE', detail:'ConvoAAVE has grown to nearly fifty thousand words of everyday, unscripted conversation, recorded and transcribed with full consent.' },
+  { value:'5', label:'Anchor Partners', detail:'Code Ninjas, the YMCA, local schools, community and faith groups, and city and federal offices all help carry this work forward.' },
+  { value:'2026', label:'Princeton Prize Finalist', detail:'Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations, with a national vision still ahead.' }
+];
+
+function statCardTexture(card){
+  var c = document.createElement('canvas'); c.width = 520; c.height = 420;
+  var ctx = c.getContext('2d');
+  var g = ctx.createLinearGradient(0,0,0,c.height);
+  g.addColorStop(0, '#0c1016'); g.addColorStop(1, '#05070a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle = 'rgba(30,144,255,0.55)'; ctx.lineWidth = 6;
+  ctx.strokeRect(10,10,c.width-20,c.height-20);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#1E90FF';
+  ctx.font = '700 96px "Space Grotesk", sans-serif';
+  ctx.shadowColor = 'rgba(30,144,255,0.6)'; ctx.shadowBlur = 24;
+  ctx.fillText(card.value, c.width/2, 210);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#eef3f8';
+  ctx.font = '500 34px Jost, sans-serif';
+  ctx.fillText(card.label.toUpperCase(), c.width/2, 280);
+  ctx.fillStyle = '#8fa2b3';
+  ctx.font = '300 20px Jost, sans-serif';
+  ctx.fillText('TAP FOR NEXT', c.width/2, 370);
+  return new THREE.CanvasTexture(c);
+}
+
+var impactGroup = pedestalBase();
+var impactCardMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(1.3, 1.05),
+  new THREE.MeshBasicMaterial({ map: statCardTexture(STAT_CARDS[0]) })
+);
+impactCardMesh.position.set(0, 2.45, 0);
+impactGroup.add(impactCardMesh);
+var impactAngle = arcStart + arcSpan*0.08;
+var impactRadius = 8.4;
+impactGroup.position.set(Math.cos(impactAngle)*impactRadius, 0, Math.sin(impactAngle)*impactRadius);
+impactGroup.lookAt(0, 2.45, 0);
+impactGroup.userData.isImpact = true;
+impactGroup.userData.cardIndex = 0;
+impactGroup.userData.cardMesh = impactCardMesh;
+impactGroup.userData.rootGroup = impactGroup;
+impactGroup.traverse(function(o){ o.userData.rootGroup = impactGroup; });
+var impactHit = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,3,10), new THREE.MeshBasicMaterial({visible:false}));
+impactHit.position.y = 1.5;
+impactGroup.add(impactHit);
+scene.add(impactGroup);
+
+/* -------------------------------------------------------------------------
+   Partner Spotlight \u2014 a rotating photo stand near the entrance that cycles
+   through partner logos on click. Reuses the gallery's baked-canvas Sprite
+   approach: one unlit texture, swapped (not re-created) on each click.
+   ------------------------------------------------------------------------- */
+var PARTNER_SPOTLIGHT = [
+  { file:'partner-ymca.jpg', name:'The YMCA', detail:'The YMCA carried AI Pathways Camp beyond the classroom, giving the program a second home.' },
+  { file:'MainYMCA.jpg', name:'YMCA Classrooms', detail:'YMCA classrooms across Hartford and East Hartford hosted hands-on sessions where students built and questioned real machine learning models.' },
+  { file:'CongressmanMeeting.png', name:'Congress', detail:'Working with Congressman John Larson\u2019s office turned grassroots research into a federal grant proposal.' }
+];
+
+var spotlightGroup = new THREE.Group();
+var spotlightStand = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,1.9,10), new THREE.MeshStandardMaterial({color:COLOR.blackSoft, metalness:0.7, roughness:0.3}));
+spotlightStand.position.y = 0.95;
+var spotlightBase = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.48,0.14,16), new THREE.MeshStandardMaterial({color:COLOR.black, roughness:0.5}));
+spotlightBase.position.y = 0.07;
+var spotlightPhoto = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.Texture(), transparent:false }));
+spotlightPhoto.position.y = 2.05;
+spotlightGroup.add(spotlightStand, spotlightBase, spotlightPhoto);
+var spotlightAngle = arcStart + arcSpan*0.22;
+var spotlightRadius = 8.4;
+spotlightGroup.position.set(Math.cos(spotlightAngle)*spotlightRadius, 0, Math.sin(spotlightAngle)*spotlightRadius);
+spotlightGroup.lookAt(0, 2, 0);
+spotlightGroup.userData.isSpotlight = true;
+spotlightGroup.userData.index = 0;
+spotlightGroup.userData.photo = spotlightPhoto;
+spotlightGroup.userData.rootGroup = spotlightGroup;
+spotlightGroup.traverse(function(o){ o.userData.rootGroup = spotlightGroup; });
+var spotlightHit = new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,2.4,10), new THREE.MeshBasicMaterial({visible:false}));
+spotlightHit.position.y = 1.2;
+spotlightGroup.add(spotlightHit);
+scene.add(spotlightGroup);
+
+function loadSpotlightFrame(idx){
+  var entry = PARTNER_SPOTLIGHT[idx];
+  var img = new Image();
+  img.onload = function(){
+    var aspect = img.naturalWidth / (img.naturalHeight || 1);
+    var h = 1.15, w = h*aspect;
+    if(w > h*1.9){ w = h*1.9; } if(w < h*0.5){ w = h*0.5; }
+    var pad = 0.1, ppu = 220;
+    var canvas = document.createElement('canvas');
+    canvas.width = Math.round((w+pad*2)*ppu); canvas.height = Math.round((h+pad*2)*ppu);
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#1E90FF'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#0c1016';
+    var bp = Math.round(pad*0.5*ppu);
+    ctx.fillRect(bp,bp,canvas.width-bp*2,canvas.height-bp*2);
+    ctx.drawImage(img, Math.round(pad*ppu), Math.round(pad*ppu), Math.round(w*ppu), Math.round(h*ppu));
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.encoding = THREE.sRGBEncoding;
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    spotlightPhoto.material.map = tex;
+    spotlightPhoto.material.needsUpdate = true;
+    spotlightPhoto.scale.set(canvas.width/ppu, canvas.height/ppu, 1);
+  };
+  img.src = 'media-web/' + entry.file;
+}
+loadSpotlightFrame(0);
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
@@ -1794,7 +1914,7 @@ function onPointerDown(e){
 
   var targets = pedestals.concat([secretTile, armillary]).concat(torches).concat(voicesGroup.children)
     .concat(niches).concat([guestbookGroup]).concat(benches).concat([mapGroup, hourglassGroup]).concat(milestoneGroup.children)
-    .concat([mirrorGroup, podiumGroup]);
+    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]);
   var intersects = raycaster.intersectObjects(targets, true);
   if(!intersects.length) return;
   var root = findRoot(intersects[0].object);
@@ -1857,6 +1977,20 @@ function onPointerDown(e){
   if(root.userData && root.userData.isHourglass){
     showToast(VISION_2028[hourglassGroup.userData.clickCount % VISION_2028.length]);
     hourglassGroup.userData.clickCount = (hourglassGroup.userData.clickCount || 0) + 1;
+    return;
+  }
+  if(root.userData && root.userData.isImpact){
+    root.userData.cardIndex = (root.userData.cardIndex + 1) % STAT_CARDS.length;
+    var card = STAT_CARDS[root.userData.cardIndex];
+    root.userData.cardMesh.material.map = statCardTexture(card);
+    root.userData.cardMesh.material.needsUpdate = true;
+    showToast(card.detail);
+    return;
+  }
+  if(root.userData && root.userData.isSpotlight){
+    root.userData.index = (root.userData.index + 1) % PARTNER_SPOTLIGHT.length;
+    loadSpotlightFrame(root.userData.index);
+    showToast(PARTNER_SPOTLIGHT[root.userData.index].detail);
     return;
   }
   // ball click (search deeper since ball is nested under a pedestal icon group)
