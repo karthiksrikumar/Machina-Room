@@ -467,10 +467,16 @@ var STOPS = [
    ------------------------------------------------------------------------- */
 var canvas = document.getElementById('c');
 var renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, powerPreference:'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Capped at 1.5 instead of 2: on retina/4K displays a pixel ratio of 2 quadruples
+// fragment-shader cost versus 1x, and combined with bloom + shadows this was the
+// single biggest driver of frame time on high-DPI screens.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// PCFShadowMap instead of PCFSoftShadowMap: the soft variant does extra
+// per-sample blurring on every shadow lookup, which is not worth it combined
+// with a shadow-casting point light (see oculusLight below).
+renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 
 var scene = new THREE.Scene();
@@ -494,8 +500,11 @@ var composer = null;
 if(THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass){
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
+  // Bloom runs several blur passes over its own render target every frame;
+  // sizing it at half resolution instead of full window size cuts that cost
+  // ~4x with no visible difference since bloom is a soft, low-frequency glow.
   var bloomPass = new THREE.UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(window.innerWidth*0.5, window.innerHeight*0.5),
     0.42,  // strength - light theme: kept low so bloom doesn't wash out on a bright background
     0.45,  // radius
     0.55   // threshold - only the most saturated emissive accents bloom
@@ -721,8 +730,14 @@ scene.add(ambientFill);
 var oculusLight = new THREE.PointLight(0xfff6e6, 1.9, 46, 2);
 oculusLight.position.set(0, 12, 0);
 oculusLight.castShadow = true;
-oculusLight.shadow.mapSize.set(1024,1024);
-oculusLight.shadow.radius = 4;
+// Point-light shadows render the whole scene 6x per frame (one per cube face).
+// This was by far the most expensive thing in the scene: 1024x1024 x6 faces,
+// every frame, for every shadow caster. Dropping to 512 cuts that shadow pass
+// cost to a quarter, and shadow.radius 4->1.5 removes expensive extra PCF taps.
+oculusLight.shadow.mapSize.set(512,512);
+oculusLight.shadow.radius = 1.5;
+oculusLight.shadow.camera.near = 1;
+oculusLight.shadow.camera.far = 24;
 scene.add(oculusLight);
 
 var fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
@@ -808,7 +823,9 @@ for(var i=0;i<N_COL;i++){
   var cx = Math.cos(ang)*(ROOM_R-0.55), cz = Math.sin(ang)*(ROOM_R-0.55);
   var colGroup = new THREE.Group();
   var fin = new THREE.Mesh(new THREE.BoxGeometry(0.32,6.6,0.14), pylonMat);
-  fin.position.y = 3.5; fin.castShadow = true;
+  // castShadow off: 20 of these get rendered into all 6 faces of oculusLight's
+  // cubemap shadow every frame for a shadow that's barely visible on thin fins.
+  fin.position.y = 3.5;
   var glowColor = BRAND[i % BRAND.length];
   var edge = new THREE.Mesh(new THREE.BoxGeometry(0.045,6.6,0.045), new THREE.MeshStandardMaterial({ color:glowColor, emissive:glowColor, emissiveIntensity:0.85, roughness:0.3 }));
   edge.position.set(0.17, 3.5, 0.02);
@@ -1305,14 +1322,11 @@ nicheAngles.forEach(function(ang, ni){
    scattered around the rotunda wall at varying heights and sizes.
    Filenames containing "ymca" get a larger frame.
    ------------------------------------------------------------------- */
+// Trimmed to a curated set of 10 (from 34) to cut load and render time:
+// fewer texture downloads/decodes and fewer draw calls for the gallery.
 var GALLERY = [
-  'CongressmanMeeting.png','ConvoAAVE.png','MachinaMundiLogo.jpg','MainPrinecton.jpg','MainYMCA.jpg',
-  'News.jpg','PrincetonWinners.jpg','PrinectionSpeech1.jpg','Prinecton.jpg','PrinectonSpeech.jpg',
-  'UpliftGroup.jpg','UpliftGroups.jpg','UpliftHartford.jpg','UpliftWelcomeSign.jpg',
-  'YMCA1.jpg','YMCAClass.jpg','YMCAClassroom.jpg','anil.jpg','basanth.jpg',
-  'partner-codeninjas.jpg','partner-community.jpg','partner-congress.jpg','partner-mayor.jpg',
-  'partner-schools.jpg','partner-ymca.jpg','student1.jpeg','student1.jpg','student10.png',
-  'student12.jpg','student13.jpg','student2.png','student4.png','student6.jpg','student7.jpg','student8.jpg'
+  'MachinaMundiLogo.jpg','CongressmanMeeting.png','ConvoAAVE.png','MainPrinecton.jpg',
+  'MainYMCA.jpg','News.jpg','UpliftGroup.jpg','YMCAClass.jpg','partner-ymca.jpg','student1.jpg'
 ];
 // GALLERY points at media-web/, a pre-compressed/resized copy of media/ (97.6MB -> 3.0MB)
 // generated for fast load times; the originals in media/ are untouched.
@@ -2095,6 +2109,9 @@ window.addEventListener('resize', function(){
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   if(composer) composer.setSize(window.innerWidth, window.innerHeight);
+  // composer.setSize resets UnrealBloomPass's internal target back to full
+  // resolution, undoing the half-res optimization above; re-apply it here.
+  if(bloomPass) bloomPass.setSize(window.innerWidth*0.5, window.innerHeight*0.5);
 });
 
 /* -------------------------------------------------------------------------
