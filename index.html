@@ -2726,6 +2726,13 @@ function animate(){
       if(cameraFly.t>=1){ cameraFly = null; controls.enabled = true; }
     }
     controls.update();
+    // A barely-there idle sway so the view never looks perfectly static,
+    // applied after controls.update() so it can't fight with orbit dragging
+    // or accumulate -- it's re-derived fresh from t every frame.
+    if(!cameraFly){
+      camera.position.x += Math.sin(t*0.2)*0.03;
+      camera.position.y += Math.sin(t*0.15 + 1.3)*0.02;
+    }
   }
 
   if(composer) composer.render();
