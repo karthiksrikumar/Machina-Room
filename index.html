@@ -1263,14 +1263,18 @@ nicheAngles.forEach(function(ang, ni){
    call that always faces the camera. 10 photos = 10 cheap draws instead
    of 30 lit ones, with no per-light shading cost at all.
    ------------------------------------------------------------------- */
-// Trimmed to a curated set (from 34) to cut load and render time: fewer
-// texture downloads/decodes and fewer draw calls for the gallery.
+// Every non-portrait image in media/: events, group photos, signage, logos
+// and partner marks. Individual headshot-style photos (single students or
+// team members) are deliberately left out of the wall gallery.
 var GALLERY = [
   'MachinaMundiLogo.jpg','CongressmanMeeting.png','ConvoAAVE.png','MainPrinecton.jpg',
-  'MainYMCA.jpg','News.jpg','UpliftGroup.jpg','YMCAClass.jpg','partner-ymca.jpg','student1.jpg',
-  'PrincetonWinners.jpg','UpliftGroups.jpg','student2.png','student7.jpg','anil.jpg','basanth.jpg'
+  'MainYMCA.jpg','News.jpg','UpliftGroup.jpg','YMCAClass.jpg','partner-ymca.jpg',
+  'PrincetonWinners.jpg','UpliftGroups.jpg','PrinectionSpeech1.jpg','Prinecton.jpg',
+  'PrinectonSpeech.jpg','UpliftHartford.jpg','UpliftWelcomeSign.jpg','YMCA1.jpg',
+  'YMCAClassroom.jpg','partner-codeninjas.jpg','partner-community.jpg','partner-congress.jpg',
+  'partner-schools.jpg'
 ];
-// GALLERY points at media-web/, a pre-compressed/resized copy of media/ (97.6MB -> 3.0MB)
+// GALLERY points at media-web/, a pre-compressed/resized copy of media/
 // generated for fast load times; the originals in media/ are untouched.
 
 function hexColor(n){ return '#' + n.toString(16).padStart(6, '0'); }
@@ -1803,11 +1807,12 @@ function loadSpotlightFrame(idx){
 loadSpotlightFrame(0);
 
 /* -------------------------------------------------------------------------
-   AAVE-LLM walker — a student, walking in through the doorway with a laptop
-   open to the model the program builds, then back out again. Built entirely
+   Kid walkers — a handful of students moving around the room, one of them
+   carrying a laptop open to the model the program builds. Built entirely
    from the same low-poly primitives as the rest of the room (a handful of
-   cylinders, spheres and boxes) so it costs about as much as one more
-   pedestal, plus one small baked canvas texture for the laptop screen.
+   cylinders, spheres and boxes) so each one costs about as much as one more
+   pedestal, plus (for the one with a laptop) a single small baked canvas
+   texture for the screen.
    ------------------------------------------------------------------------- */
 function laptopScreenTexture(){
   var c = document.createElement('canvas'); c.width = 256; c.height = 176;
@@ -1827,14 +1832,11 @@ function laptopScreenTexture(){
   return new THREE.CanvasTexture(c);
 }
 
-function createAAVEWalker(){
+function createKidWalker(shirtColor, skinTone, hasLaptop){
   var g = new THREE.Group();
-  var skin = 0x6b4226; // representing a Black student, drawn from the same SKIN_TONES palette used throughout the room
-  var shirt = COLOR.blue;
-
-  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.19,0.5,10), new THREE.MeshStandardMaterial({color:shirt, roughness:0.6}));
+  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.19,0.5,10), new THREE.MeshStandardMaterial({color:shirtColor, roughness:0.6}));
   body.position.y = 0.46;
-  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17,14,14), new THREE.MeshStandardMaterial({color:skin, roughness:0.55}));
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17,14,14), new THREE.MeshStandardMaterial({color:skinTone, roughness:0.55}));
   head.position.y = 0.86;
   var hair = new THREE.Mesh(new THREE.SphereGeometry(0.175,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0x14100c, roughness:0.8}));
   hair.position.y = 0.9;
@@ -1843,24 +1845,27 @@ function createAAVEWalker(){
   var legL = new THREE.Mesh(legGeo, legMat); legL.position.set(-0.08,0.21,0);
   var legR = new THREE.Mesh(legGeo, legMat); legR.position.set(0.08,0.21,0);
   var armGeo = new THREE.CylinderGeometry(0.05,0.05,0.36,8);
-  var armMat = new THREE.MeshStandardMaterial({color:shirt, roughness:0.6});
+  var armMat = new THREE.MeshStandardMaterial({color:shirtColor, roughness:0.6});
   var armL = new THREE.Mesh(armGeo, armMat); armL.position.set(-0.22,0.6,0.08);
   var armR = new THREE.Mesh(armGeo, armMat); armR.position.set(0.22,0.6,0.08);
   g.add(body, head, hair, legL, legR, armL, armR);
 
-  var lapGroup = new THREE.Group();
-  var base = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.02,0.24), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
-  var screenBack = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.22,0.02), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
-  screenBack.position.set(0,0.11,-0.11); screenBack.rotation.x = -0.3;
-  var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.19), new THREE.MeshBasicMaterial({map: laptopScreenTexture()}));
-  screen.position.set(0,0.112,-0.099); screen.rotation.x = -0.3;
-  lapGroup.add(base, screenBack, screen);
-  lapGroup.position.set(0, 0.48, 0.22);
-  g.add(lapGroup);
+  if(hasLaptop){
+    var lapGroup = new THREE.Group();
+    var base = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.02,0.24), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
+    var screenBack = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.22,0.02), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
+    screenBack.position.set(0,0.11,-0.11); screenBack.rotation.x = -0.3;
+    var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.19), new THREE.MeshBasicMaterial({map: laptopScreenTexture()}));
+    screen.position.set(0,0.112,-0.099); screen.rotation.x = -0.3;
+    lapGroup.add(base, screenBack, screen);
+    lapGroup.position.set(0, 0.48, 0.22);
+    g.add(lapGroup);
+  }
 
   g.userData.legL = legL; g.userData.legR = legR;
   g.userData.armL = armL; g.userData.armR = armR;
   g.userData.isWalker = true;
+  g.userData.hasLaptop = !!hasLaptop;
   g.userData.rootGroup = g;
   g.traverse(function(o){ o.userData.rootGroup = g; });
   var walkerHit = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.1,8), new THREE.MeshBasicMaterial({visible:false}));
@@ -1869,14 +1874,25 @@ function createAAVEWalker(){
   return g;
 }
 
-var aaveWalker = createAAVEWalker();
-scene.add(aaveWalker);
 // Walks in from the doorway, partway into the room, then back out and
 // through again — the doorway is the "frame" it repeatedly walks through.
 var WALK_Z_START = DOOR_Z + 2.2;
 var WALK_Z_END = DOOR_Z + 11;
 var WALK_DIST = WALK_Z_END - WALK_Z_START;
-var WALK_SPEED = 0.55;
+
+var aaveWalker = createKidWalker(COLOR.blue, 0x6b4226, true);
+scene.add(aaveWalker);
+
+// A few more kids, drawn from the same skin-tone and brand-color palettes
+// used throughout the room, pacing slow circles at different radii so they
+// never collide with each other or with the doorway walker.
+var KIDS = [
+  { group: aaveWalker, mode:'door', speed: 0.55 },
+  { group: createKidWalker(COLOR.aqua, SKIN_TONES[0], false), mode:'circle', radius: 4.6, phase: 0.0, speed: 0.16 },
+  { group: createKidWalker(COLOR.amethyst, SKIN_TONES[3], false), mode:'circle', radius: 6.4, phase: Math.PI * 0.66, speed: 0.13 },
+  { group: createKidWalker(COLOR.frost, SKIN_TONES[5], false), mode:'circle', radius: 5.5, phase: Math.PI * 1.3, speed: 0.19 }
+];
+KIDS.forEach(function(k){ if(k.group !== aaveWalker) scene.add(k.group); });
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
@@ -2013,7 +2029,7 @@ function onPointerDown(e){
 
   var targets = pedestals.concat([secretTile, armillary]).concat(torches).concat(voicesGroup.children)
     .concat(niches).concat([guestbookGroup]).concat(benches).concat([mapGroup, hourglassGroup]).concat(milestoneGroup.children)
-    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]).concat([aaveWalker]);
+    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]).concat(KIDS.map(function(k){ return k.group; }));
   var intersects = raycaster.intersectObjects(targets, true);
   if(!intersects.length) return;
   var root = findRoot(intersects[0].object);
@@ -2093,7 +2109,9 @@ function onPointerDown(e){
     return;
   }
   if(root.userData && root.userData.isWalker){
-    showToast('This is what the work looks like in practice: a student training AAVE-LLM, a small language model built to actually understand the way this community speaks.');
+    showToast(root.userData.hasLaptop
+      ? 'This is what the work looks like in practice: a student training AAVE-LLM, a small language model built to actually understand the way this community speaks.'
+      : 'Every student who walks through this program is part of why it exists.');
     return;
   }
   // ball click (search deeper since ball is nested under a pedestal icon group)
@@ -2321,18 +2339,30 @@ function animate(){
   });
   oculusLight.intensity = 1.5 + Math.sin(t*0.6)*0.08;
 
-  // AAVE-LLM walker: paces from the doorway into the room and back, looping
-  var cyc = (t*WALK_SPEED) % (WALK_DIST*2);
-  var forward = cyc < WALK_DIST;
-  var zOff = forward ? cyc : (WALK_DIST*2 - cyc);
-  aaveWalker.position.z = WALK_Z_START + zOff;
-  aaveWalker.position.y = Math.abs(Math.sin(t*6))*0.03;
-  aaveWalker.rotation.y = forward ? 0 : Math.PI;
-  var legSwing = Math.sin(t*6)*0.5;
-  aaveWalker.userData.legL.rotation.x = legSwing;
-  aaveWalker.userData.legR.rotation.x = -legSwing;
-  aaveWalker.userData.armL.rotation.x = -0.9 - legSwing*0.3;
-  aaveWalker.userData.armR.rotation.x = -0.9 + legSwing*0.3;
+  // Kid walkers: one paces the doorway, the rest pace slow circles at
+  // different radii and phases so they never collide with each other.
+  KIDS.forEach(function(k){
+    var grp = k.group;
+    var legSwing = Math.sin(t*6 + (k.phase||0))*0.5;
+    grp.userData.legL.rotation.x = legSwing;
+    grp.userData.legR.rotation.x = -legSwing;
+    grp.userData.armL.rotation.x = -0.9 - legSwing*0.3;
+    grp.userData.armR.rotation.x = -0.9 + legSwing*0.3;
+    grp.position.y = Math.abs(Math.sin(t*6 + (k.phase||0)))*0.03;
+    if(k.mode === 'door'){
+      var cyc = (t*k.speed) % (WALK_DIST*2);
+      var forward = cyc < WALK_DIST;
+      var zOff = forward ? cyc : (WALK_DIST*2 - cyc);
+      grp.position.x = 0;
+      grp.position.z = WALK_Z_START + zOff;
+      grp.rotation.y = forward ? 0 : Math.PI;
+    } else if(k.mode === 'circle'){
+      var ang = t*k.speed + k.phase;
+      grp.position.x = Math.cos(ang)*k.radius;
+      grp.position.z = Math.sin(ang)*k.radius;
+      grp.rotation.y = ang + Math.PI/2;
+    }
+  });
 
   // armillary rotation
   armillary.rotation.y += dt*0.12;
