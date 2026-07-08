@@ -1352,7 +1352,7 @@ var BAY_ANGLES = (function(){
     var ang = bayAngle + (Math.random() - 0.5) * 0.03;
     var y = bandY[i % bandY.length] + (Math.random() - 0.5) * 0.5;
     var isBig = /ymca/i.test(file);
-    var baseSize = 0.5 + Math.random() * 0.22;
+    var baseSize = 0.62 + Math.random() * 0.26;
     addPictureFrame(file, ang, y, baseSize, isBig, i);
   });
 })();
@@ -1832,6 +1832,28 @@ function laptopScreenTexture(){
   return new THREE.CanvasTexture(c);
 }
 
+// A proper hinged laptop: a flat deck plus a lid that pivots open from the
+// deck's back edge (rather than two separately-positioned boxes that don't
+// actually meet at a hinge, which is what made the earlier version render
+// oddly). Reused for both the walking kid and the kid at the desk below.
+function buildLaptop(){
+  var group = new THREE.Group();
+  var mat = new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4});
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.018,0.22), mat);
+  group.add(deck);
+
+  var lidPivot = new THREE.Group();
+  lidPivot.position.set(0, 0.009, -0.11); // deck's back edge, where the hinge sits
+  lidPivot.rotation.x = -1.95; // opened to roughly 110 degrees off the deck
+  var lid = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.19,0.012), mat);
+  lid.position.set(0,0.095,0); // lid's own bottom edge sits at the hinge
+  var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.26,0.15), new THREE.MeshBasicMaterial({map: laptopScreenTexture()}));
+  screen.position.set(0,0.095,0.0065);
+  lidPivot.add(lid, screen);
+  group.add(lidPivot);
+  return group;
+}
+
 function createKidWalker(shirtColor, skinTone, hasLaptop){
   var g = new THREE.Group();
   var body = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.19,0.5,10), new THREE.MeshStandardMaterial({color:shirtColor, roughness:0.6}));
@@ -1851,15 +1873,14 @@ function createKidWalker(shirtColor, skinTone, hasLaptop){
   g.add(body, head, hair, legL, legR, armL, armR);
 
   if(hasLaptop){
-    var lapGroup = new THREE.Group();
-    var base = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.02,0.24), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
-    var screenBack = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.22,0.02), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
-    screenBack.position.set(0,0.11,-0.11); screenBack.rotation.x = -0.3;
-    var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.19), new THREE.MeshBasicMaterial({map: laptopScreenTexture()}));
-    screen.position.set(0,0.112,-0.099); screen.rotation.x = -0.3;
-    lapGroup.add(base, screenBack, screen);
-    lapGroup.position.set(0, 0.48, 0.22);
-    g.add(lapGroup);
+    var laptop = buildLaptop();
+    laptop.position.set(0, 0.5, 0.2);
+    laptop.rotation.x = -0.25; // tips the screen up towards the direction of travel
+    g.add(laptop);
+    // Held in a fixed grip rather than swinging with the walk cycle -- the
+    // arm-swing animation below is skipped for kids carrying a laptop.
+    armL.rotation.set(-1.3, 0, 0.3);
+    armR.rotation.set(-1.3, 0, -0.3);
   }
 
   g.userData.legL = legL; g.userData.legR = legR;
@@ -1893,6 +1914,85 @@ var KIDS = [
   { group: createKidWalker(COLOR.frost, SKIN_TONES[5], false), mode:'circle', radius: 5.5, phase: Math.PI * 1.3, speed: 0.19 }
 ];
 KIDS.forEach(function(k){ if(k.group !== aaveWalker) scene.add(k.group); });
+
+/* -------------------------------------------------------------------------
+   Study table — a kid off to the side, seated and working at a laptop.
+   Built from the same primitives as everything else, reusing buildLaptop()
+   from above. Idle animation only (typing hands, a slight head tilt), no
+   walking, so it costs even less than the pacing kids.
+   ------------------------------------------------------------------------- */
+function buildStudyTable(){
+  var g = new THREE.Group();
+  var surfaceMat = new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6});
+  var legMat = new THREE.MeshStandardMaterial({color:COLOR.blackSoft, roughness:0.5, metalness:0.3});
+
+  var tableTop = new THREE.Mesh(new THREE.BoxGeometry(1.1,0.06,0.6), surfaceMat);
+  tableTop.position.y = 0.72;
+  g.add(tableTop);
+  var tableLegGeo = new THREE.CylinderGeometry(0.035,0.035,0.7,8);
+  [[-0.48,0.24],[0.48,0.24],[-0.48,-0.24],[0.48,-0.24]].forEach(function(o){
+    var leg = new THREE.Mesh(tableLegGeo, legMat);
+    leg.position.set(o[0],0.35,o[1]);
+    g.add(leg);
+  });
+
+  var chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.05,0.4), legMat);
+  chairSeat.position.set(0,0.42,0.55);
+  var chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.05), legMat);
+  chairBack.position.set(0,0.65,0.73);
+  g.add(chairSeat, chairBack);
+  var chairLegGeo = new THREE.CylinderGeometry(0.025,0.025,0.42,8);
+  [[-0.16,0.4],[0.16,0.4],[-0.16,0.7],[0.16,0.7]].forEach(function(o){
+    var leg = new THREE.Mesh(chairLegGeo, legMat);
+    leg.position.set(o[0],0.21,o[1]);
+    g.add(leg);
+  });
+
+  var shirt = COLOR.aqua, skin = SKIN_TONES[2];
+  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.17,0.36,10), new THREE.MeshStandardMaterial({color:shirt, roughness:0.6}));
+  torso.position.set(0,0.62,0.5);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16,14,14), new THREE.MeshStandardMaterial({color:skin, roughness:0.55}));
+  head.position.set(0,0.92,0.5);
+  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.165,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0x14100c, roughness:0.8}));
+  hair.position.set(0,0.955,0.5);
+
+  var limbMat = new THREE.MeshStandardMaterial({color:0x11141a, roughness:0.7});
+  var thighGeo = new THREE.CylinderGeometry(0.055,0.055,0.32,8);
+  var thighL = new THREE.Mesh(thighGeo, limbMat); thighL.rotation.x = Math.PI/2; thighL.position.set(-0.08,0.44,0.35);
+  var thighR = thighL.clone(); thighR.position.x = 0.08;
+  var shinGeo = new THREE.CylinderGeometry(0.05,0.05,0.42,8);
+  var shinL = new THREE.Mesh(shinGeo, limbMat); shinL.position.set(-0.08,0.21,0.5);
+  var shinR = shinL.clone(); shinR.position.x = 0.08;
+
+  var armGeo = new THREE.CylinderGeometry(0.045,0.045,0.3,8);
+  var armMat = new THREE.MeshStandardMaterial({color:shirt, roughness:0.6});
+  var armL = new THREE.Mesh(armGeo, armMat); armL.rotation.z = Math.PI/2.3; armL.position.set(-0.18,0.72,0.32);
+  var armR = new THREE.Mesh(armGeo, armMat); armR.rotation.z = -Math.PI/2.3; armR.position.set(0.18,0.72,0.32);
+
+  g.add(torso, head, hair, thighL, thighR, shinL, shinR, armL, armR);
+
+  var laptop = buildLaptop();
+  laptop.position.set(0,0.75,0.15);
+  laptop.rotation.x = -0.05;
+  g.add(laptop);
+
+  g.userData.armL = armL; g.userData.armR = armR; g.userData.head = head;
+  g.userData.armLBaseY = armL.position.y; g.userData.armRBaseY = armR.position.y;
+  g.userData.isStudyTable = true;
+  g.userData.rootGroup = g;
+  g.traverse(function(o){ o.userData.rootGroup = g; });
+  var hit = new THREE.Mesh(new THREE.CylinderGeometry(0.9,0.9,1.6,10), new THREE.MeshBasicMaterial({visible:false}));
+  hit.position.y = 0.6;
+  g.add(hit);
+  return g;
+}
+
+var studyTable = buildStudyTable();
+var studyTableAngle = arcStart + arcSpan*0.9;
+var studyTableRadius = 8.2;
+studyTable.position.set(Math.cos(studyTableAngle)*studyTableRadius, 0, Math.sin(studyTableAngle)*studyTableRadius);
+studyTable.lookAt(0, 0.7, 0);
+scene.add(studyTable);
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
@@ -2029,7 +2129,8 @@ function onPointerDown(e){
 
   var targets = pedestals.concat([secretTile, armillary]).concat(torches).concat(voicesGroup.children)
     .concat(niches).concat([guestbookGroup]).concat(benches).concat([mapGroup, hourglassGroup]).concat(milestoneGroup.children)
-    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]).concat(KIDS.map(function(k){ return k.group; }));
+    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]).concat(KIDS.map(function(k){ return k.group; }))
+    .concat([studyTable]);
   var intersects = raycaster.intersectObjects(targets, true);
   if(!intersects.length) return;
   var root = findRoot(intersects[0].object);
@@ -2112,6 +2213,10 @@ function onPointerDown(e){
     showToast(root.userData.hasLaptop
       ? 'This is what the work looks like in practice: a student training AAVE-LLM, a small language model built to actually understand the way this community speaks.'
       : 'Every student who walks through this program is part of why it exists.');
+    return;
+  }
+  if(root.userData && root.userData.isStudyTable){
+    showToast('Off to the side, the quieter side of the work: hours at a laptop, one small model getting a little better at understanding an entire community.');
     return;
   }
   // ball click (search deeper since ball is nested under a pedestal icon group)
@@ -2346,8 +2451,10 @@ function animate(){
     var legSwing = Math.sin(t*6 + (k.phase||0))*0.5;
     grp.userData.legL.rotation.x = legSwing;
     grp.userData.legR.rotation.x = -legSwing;
-    grp.userData.armL.rotation.x = -0.9 - legSwing*0.3;
-    grp.userData.armR.rotation.x = -0.9 + legSwing*0.3;
+    if(!grp.userData.hasLaptop){
+      grp.userData.armL.rotation.x = -0.9 - legSwing*0.3;
+      grp.userData.armR.rotation.x = -0.9 + legSwing*0.3;
+    }
     grp.position.y = Math.abs(Math.sin(t*6 + (k.phase||0)))*0.03;
     if(k.mode === 'door'){
       var cyc = (t*k.speed) % (WALK_DIST*2);
@@ -2363,6 +2470,11 @@ function animate(){
       grp.rotation.y = ang + Math.PI/2;
     }
   });
+
+  // study table: idle typing hands and a slight head tilt
+  studyTable.userData.armL.position.y = studyTable.userData.armLBaseY + Math.sin(t*7)*0.012;
+  studyTable.userData.armR.position.y = studyTable.userData.armRBaseY + Math.sin(t*7 + 1.3)*0.012;
+  studyTable.userData.head.rotation.x = Math.sin(t*0.8)*0.06;
 
   // armillary rotation
   armillary.rotation.y += dt*0.12;
