@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Machina Mundi</title>
+<link rel="icon" type="image/jpeg" href="media-web/MachinaMundiLogo.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -749,12 +750,14 @@ scene.add(shaft);
    Colonnade
    ------------------------------------------------------------------------- */
 var columns = new THREE.Group();
+var COLUMN_ANGLES = []; // recorded so the photo gallery can avoid hanging frames behind a column
 var colTex = marbleTexture(COLOR.marble, COLOR.marbleDim, 256);
 colTex.repeat.set(1,3);
 var N_COL = 20;
 for(var i=0;i<N_COL;i++){
   var ang = (i/N_COL)*Math.PI*2;
   if(Math.abs(((ang - DOOR_ANGLE + Math.PI*3)%(Math.PI*2)) - Math.PI) < GAP*1.1) continue;
+  COLUMN_ANGLES.push(ang);
   var cx = Math.cos(ang)*(ROOM_R-0.55), cz = Math.sin(ang)*(ROOM_R-0.55);
   var colGroup = new THREE.Group();
   var shaftMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.48,6.4,16), new THREE.MeshStandardMaterial({map:colTex, roughness:0.7}));
@@ -1204,7 +1207,7 @@ function messageSprite(text){
 /* ---- Fact niches along the wall ---- */
 var FACTS = [
   'The name Machina Mundi points to something ambitious. A machine built to understand the whole world, not just part of it.',
-  'The very first version of the camp ran for just three afternoons before it grew into something much bigger.',
+  'Studies of large language model training data have found that text written in African American Vernacular English makes up a tiny fraction of what most models ever see. ConvoAAVE exists to close that gap.',
   'ConvoAAVE was never scraped from the internet. Every word was recorded with the consent of the person speaking.',
   'Hartford and East Hartford sit only minutes apart, and this program was built to serve both at once.',
   'Most of the team is still in high school or college. Several started as students in the very camps they now help run.',
@@ -1260,11 +1263,12 @@ nicheAngles.forEach(function(ang, ni){
    call that always faces the camera. 10 photos = 10 cheap draws instead
    of 30 lit ones, with no per-light shading cost at all.
    ------------------------------------------------------------------- */
-// Trimmed to a curated set of 10 (from 34) to cut load and render time:
-// fewer texture downloads/decodes and fewer draw calls for the gallery.
+// Trimmed to a curated set (from 34) to cut load and render time: fewer
+// texture downloads/decodes and fewer draw calls for the gallery.
 var GALLERY = [
   'MachinaMundiLogo.jpg','CongressmanMeeting.png','ConvoAAVE.png','MainPrinecton.jpg',
-  'MainYMCA.jpg','News.jpg','UpliftGroup.jpg','YMCAClass.jpg','partner-ymca.jpg','student1.jpg'
+  'MainYMCA.jpg','News.jpg','UpliftGroup.jpg','YMCAClass.jpg','partner-ymca.jpg','student1.jpg',
+  'PrincetonWinners.jpg','UpliftGroups.jpg','student2.png','student7.jpg','anil.jpg','basanth.jpg'
 ];
 // GALLERY points at media-web/, a pre-compressed/resized copy of media/ (97.6MB -> 3.0MB)
 // generated for fast load times; the originals in media/ are untouched.
@@ -1275,10 +1279,13 @@ function addPictureFrame(file, angle, y, baseSize, isBig, ni){
   var img = new Image();
   img.onload = function(){
     var aspect = img.naturalWidth / (img.naturalHeight || 1);
-    var h = baseSize * (isBig ? 1.45 : 1);
+    var h = baseSize * (isBig ? 1.35 : 1);
     var w = h * aspect;
-    if(w > h * 2.2){ w = h * 2.2; }
-    if(w < h * 0.45){ w = h * 0.45; }
+    // Clamped well under a single column bay's width (~4.6 world units at the
+    // wall) so a frame can never span wide enough to reach into a neighbor's
+    // bay and end up behind a column.
+    if(w > h * 1.5){ w = h * 1.5; }
+    if(w < h * 0.55){ w = h * 0.55; }
 
     // Bake photo + frame + glow edge into one canvas at a fixed px-per-world-unit
     // scale, independent of the source image resolution, so texture memory
@@ -1316,17 +1323,32 @@ function addPictureFrame(file, angle, y, baseSize, isBig, ni){
   img.src = 'media-web/' + file;
 }
 
+// Frames are hung at the midpoint angle of each "bay" between two adjacent
+// columns, rather than at continuously-spaced angles nudged away from
+// collisions: with columns evenly spaced every ~0.31 rad, a nudge-based
+// search has almost no clear room to nudge into. A bay midpoint is by
+// construction the single farthest point from both flanking columns, so a
+// frame placed there (kept narrower than the bay, see addPictureFrame) can
+// never end up behind one. The unusually wide bay next to the door (where
+// the doorway itself sits) is skipped since there's no wall there to hang on.
+var BAY_ANGLES = (function(){
+  var bays = [];
+  for(var j = 0; j < COLUMN_ANGLES.length; j++){
+    var a = COLUMN_ANGLES[j], b = COLUMN_ANGLES[(j + 1) % COLUMN_ANGLES.length];
+    if(b < a) b += Math.PI * 2;
+    if((b - a) < 0.5) bays.push((a + b) / 2);
+  }
+  return bays;
+})();
+
 (function buildGallery(){
-  var N = GALLERY.length;
-  var startAngle = DOOR_ANGLE + GAP * 1.6;
-  var totalArc = Math.PI * 2 - GAP * 3.2;
-  var step = totalArc / N;
   var bandY = [2.25, 4.1, 5.95];
   GALLERY.forEach(function(file, i){
-    var ang = startAngle + i * step + (Math.random() - 0.5) * step * 0.4;
+    var bayAngle = BAY_ANGLES[i % BAY_ANGLES.length];
+    var ang = bayAngle + (Math.random() - 0.5) * 0.03;
     var y = bandY[i % bandY.length] + (Math.random() - 0.5) * 0.5;
     var isBig = /ymca/i.test(file);
-    var baseSize = 0.85 + Math.random() * 0.9;
+    var baseSize = 0.5 + Math.random() * 0.22;
     addPictureFrame(file, ang, y, baseSize, isBig, i);
   });
 })();
@@ -1670,7 +1692,8 @@ var STAT_CARDS = [
   { value:'900+', label:'Students Trained', detail:'More than nine hundred students have gone through AI Pathways Camp so far, moving from users of technology to builders of it.' },
   { value:'50,000+', label:'Words in ConvoAAVE', detail:'ConvoAAVE has grown to nearly fifty thousand words of everyday, unscripted conversation, recorded and transcribed with full consent.' },
   { value:'5', label:'Anchor Partners', detail:'Code Ninjas, the YMCA, local schools, community and faith groups, and city and federal offices all help carry this work forward.' },
-  { value:'2026', label:'Princeton Prize Finalist', detail:'Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations, with a national vision still ahead.' }
+  { value:'2026', label:'Princeton Prize Finalist', detail:'Machina Mundi was named a Regional Finalist for the Princeton Prize in Race Relations, with a national vision still ahead.' },
+  { value:'1', label:'Dialect, Finally Heard', detail:'Most AI training text barely includes African American Vernacular English. ConvoAAVE is one dataset working to make sure the technology understands an entire community, not just part of it.' }
 ];
 
 function statCardTexture(card){
@@ -1778,6 +1801,82 @@ function loadSpotlightFrame(idx){
   img.src = 'media-web/' + entry.file;
 }
 loadSpotlightFrame(0);
+
+/* -------------------------------------------------------------------------
+   AAVE-LLM walker — a student, walking in through the doorway with a laptop
+   open to the model the program builds, then back out again. Built entirely
+   from the same low-poly primitives as the rest of the room (a handful of
+   cylinders, spheres and boxes) so it costs about as much as one more
+   pedestal, plus one small baked canvas texture for the laptop screen.
+   ------------------------------------------------------------------------- */
+function laptopScreenTexture(){
+  var c = document.createElement('canvas'); c.width = 256; c.height = 176;
+  var ctx = c.getContext('2d');
+  ctx.fillStyle = '#04121a'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = 'rgba(30,144,255,0.6)'; ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, c.width - 4, c.height - 4);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(30,144,255,0.85)'; ctx.shadowBlur = 16;
+  ctx.fillStyle = '#1E90FF';
+  ctx.font = '700 32px "Space Grotesk", monospace';
+  ctx.fillText('AAVE-LLM', c.width / 2, c.height / 2 - 12);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#8fa2b3';
+  ctx.font = '300 13px Jost, sans-serif';
+  ctx.fillText('training in progress...', c.width / 2, c.height / 2 + 26);
+  return new THREE.CanvasTexture(c);
+}
+
+function createAAVEWalker(){
+  var g = new THREE.Group();
+  var skin = 0x6b4226; // representing a Black student, drawn from the same SKIN_TONES palette used throughout the room
+  var shirt = COLOR.blue;
+
+  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.19,0.5,10), new THREE.MeshStandardMaterial({color:shirt, roughness:0.6}));
+  body.position.y = 0.46;
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.17,14,14), new THREE.MeshStandardMaterial({color:skin, roughness:0.55}));
+  head.position.y = 0.86;
+  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.175,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0x14100c, roughness:0.8}));
+  hair.position.y = 0.9;
+  var legGeo = new THREE.CylinderGeometry(0.06,0.06,0.42,8);
+  var legMat = new THREE.MeshStandardMaterial({color:0x11141a, roughness:0.7});
+  var legL = new THREE.Mesh(legGeo, legMat); legL.position.set(-0.08,0.21,0);
+  var legR = new THREE.Mesh(legGeo, legMat); legR.position.set(0.08,0.21,0);
+  var armGeo = new THREE.CylinderGeometry(0.05,0.05,0.36,8);
+  var armMat = new THREE.MeshStandardMaterial({color:shirt, roughness:0.6});
+  var armL = new THREE.Mesh(armGeo, armMat); armL.position.set(-0.22,0.6,0.08);
+  var armR = new THREE.Mesh(armGeo, armMat); armR.position.set(0.22,0.6,0.08);
+  g.add(body, head, hair, legL, legR, armL, armR);
+
+  var lapGroup = new THREE.Group();
+  var base = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.02,0.24), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
+  var screenBack = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.22,0.02), new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4}));
+  screenBack.position.set(0,0.11,-0.11); screenBack.rotation.x = -0.3;
+  var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.19), new THREE.MeshBasicMaterial({map: laptopScreenTexture()}));
+  screen.position.set(0,0.112,-0.099); screen.rotation.x = -0.3;
+  lapGroup.add(base, screenBack, screen);
+  lapGroup.position.set(0, 0.48, 0.22);
+  g.add(lapGroup);
+
+  g.userData.legL = legL; g.userData.legR = legR;
+  g.userData.armL = armL; g.userData.armR = armR;
+  g.userData.isWalker = true;
+  g.userData.rootGroup = g;
+  g.traverse(function(o){ o.userData.rootGroup = g; });
+  var walkerHit = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.1,8), new THREE.MeshBasicMaterial({visible:false}));
+  walkerHit.position.y = 0.55;
+  g.add(walkerHit);
+  return g;
+}
+
+var aaveWalker = createAAVEWalker();
+scene.add(aaveWalker);
+// Walks in from the doorway, partway into the room, then back out and
+// through again — the doorway is the "frame" it repeatedly walks through.
+var WALK_Z_START = DOOR_Z + 2.2;
+var WALK_Z_END = DOOR_Z + 11;
+var WALK_DIST = WALK_Z_END - WALK_Z_START;
+var WALK_SPEED = 0.55;
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
@@ -1914,7 +2013,7 @@ function onPointerDown(e){
 
   var targets = pedestals.concat([secretTile, armillary]).concat(torches).concat(voicesGroup.children)
     .concat(niches).concat([guestbookGroup]).concat(benches).concat([mapGroup, hourglassGroup]).concat(milestoneGroup.children)
-    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]);
+    .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]).concat([aaveWalker]);
   var intersects = raycaster.intersectObjects(targets, true);
   if(!intersects.length) return;
   var root = findRoot(intersects[0].object);
@@ -1991,6 +2090,10 @@ function onPointerDown(e){
     root.userData.index = (root.userData.index + 1) % PARTNER_SPOTLIGHT.length;
     loadSpotlightFrame(root.userData.index);
     showToast(PARTNER_SPOTLIGHT[root.userData.index].detail);
+    return;
+  }
+  if(root.userData && root.userData.isWalker){
+    showToast('This is what the work looks like in practice: a student training AAVE-LLM, a small language model built to actually understand the way this community speaks.');
     return;
   }
   // ball click (search deeper since ball is nested under a pedestal icon group)
@@ -2217,6 +2320,19 @@ function animate(){
     tg.userData.flame.scale.setScalar(0.9+flick*0.25+boost*0.3);
   });
   oculusLight.intensity = 1.5 + Math.sin(t*0.6)*0.08;
+
+  // AAVE-LLM walker: paces from the doorway into the room and back, looping
+  var cyc = (t*WALK_SPEED) % (WALK_DIST*2);
+  var forward = cyc < WALK_DIST;
+  var zOff = forward ? cyc : (WALK_DIST*2 - cyc);
+  aaveWalker.position.z = WALK_Z_START + zOff;
+  aaveWalker.position.y = Math.abs(Math.sin(t*6))*0.03;
+  aaveWalker.rotation.y = forward ? 0 : Math.PI;
+  var legSwing = Math.sin(t*6)*0.5;
+  aaveWalker.userData.legL.rotation.x = legSwing;
+  aaveWalker.userData.legR.rotation.x = -legSwing;
+  aaveWalker.userData.armL.rotation.x = -0.9 - legSwing*0.3;
+  aaveWalker.userData.armR.rotation.x = -0.9 + legSwing*0.3;
 
   // armillary rotation
   armillary.rotation.y += dt*0.12;
