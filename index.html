@@ -126,6 +126,27 @@
     font-weight:300;
   }
 
+  /* ---------- Cutscene buttons ---------- */
+  #cutscene-buttons{
+    position:fixed; left:20px; bottom:20px; z-index:30;
+    display:flex; gap:8px; opacity:0; transition:opacity 1.6s ease;
+    pointer-events:none;
+  }
+  #cutscene-buttons.show{ opacity:1; pointer-events:auto; }
+  .cs-btn{
+    width:32px; height:32px; border-radius:50%; cursor:pointer;
+    font-family:var(--font-display); font-size:11px; letter-spacing:0.04em;
+    color:var(--c-marble-dim); background:rgba(5,7,10,0.55);
+    border:1px solid rgba(30,144,255,0.35); backdrop-filter: blur(6px);
+    transition:all 0.3s ease;
+  }
+  .cs-btn:hover{ background:rgba(30,144,255,0.22); transform:translateY(-1px); }
+  .cs-btn.playing{ opacity:0.5; pointer-events:none; }
+  .cs-btn.done{
+    background:rgba(46,204,113,0.28); border-color:#2ecc71; color:#eafff1;
+    box-shadow:0 0 10px rgba(46,204,113,0.45);
+  }
+
   #brandmark{
     position:fixed; top:26px; left:30px; z-index:30;
     font-family:var(--font-display); color:var(--c-marble);
@@ -341,6 +362,12 @@
   <div id="welcome-overlay"><div id="welcome-text">Welcome to Machina Mundi</div></div>
 
   <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click anything that glows &nbsp;&middot;&nbsp; &#8592; &#8594; moves through the story &nbsp;&middot;&nbsp; visit machinamundi.vercel.app for more</div></div>
+
+  <div id="cutscene-buttons">
+    <button class="cs-btn" data-cs="0" title="Origins">I</button>
+    <button class="cs-btn" data-cs="1" title="Voices">II</button>
+    <button class="cs-btn" data-cs="2" title="Vision">III</button>
+  </div>
 
   <div id="panel">
     <button id="panel-close" aria-label="Close">&times;</button>
@@ -2518,6 +2545,179 @@ function sitAtBench(bench){
   }, 1200);
 }
 
+/* -------------------------------------------------------------------------
+   Globe finale -- an equirectangular texture and a couple of marker dots
+   baked once, so the reveal costs nothing beyond one extra mesh sitting
+   in the scene, spinning slowly like everything else in the room.
+   ------------------------------------------------------------------------- */
+function buildGlobeTexture(){
+  var w = 512, h = 256;
+  var canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  var ctx = canvas.getContext('2d');
+  var ocean = ctx.createLinearGradient(0,0,0,h);
+  ocean.addColorStop(0, '#0a2e4d');
+  ocean.addColorStop(1, '#0f4a6e');
+  ctx.fillStyle = ocean;
+  ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = '#2f8f6f';
+  [
+    {x:0.15,y:0.35,r:0.085},{x:0.22,y:0.55,r:0.06},{x:0.48,y:0.28,r:0.075},
+    {x:0.52,y:0.5,r:0.095},{x:0.7,y:0.3,r:0.08},{x:0.78,y:0.58,r:0.06},
+    {x:0.36,y:0.72,r:0.055},{x:0.9,y:0.42,r:0.045}
+  ].forEach(function(b){
+    ctx.beginPath();
+    ctx.ellipse(b.x*w, b.y*h, b.r*w, b.r*h*1.3, 0, 0, Math.PI*2);
+    ctx.fill();
+  });
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  for(var i=1;i<8;i++){ var x=i*w/8; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+  for(var j=1;j<4;j++){ var y=j*h/4; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function latLonToVec3(lat, lon, radius){
+  var phi = (90-lat)*Math.PI/180;
+  var theta = (lon+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -radius*Math.sin(phi)*Math.cos(theta),
+    radius*Math.cos(phi),
+    radius*Math.sin(phi)*Math.sin(theta)
+  );
+}
+
+function buildGlobe(){
+  var g = new THREE.Group();
+  var radius = 1.1;
+  var sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 32, 32),
+    new THREE.MeshStandardMaterial({map: buildGlobeTexture(), roughness:0.65, metalness:0.1, emissive:COLOR.blue, emissiveIntensity:0.05})
+  );
+  g.add(sphere);
+  var glow = new THREE.Mesh(
+    new THREE.SphereGeometry(radius*1.08, 24, 24),
+    new THREE.MeshBasicMaterial({color:COLOR.aqua, transparent:true, opacity:0.12, side:THREE.BackSide})
+  );
+  g.add(glow);
+  // Hartford and East Hartford, where the program started, and Washington
+  // D.C., where the federal policy work is headed -- the same real places
+  // named throughout the story panels.
+  [
+    {lat:41.76, lon:-72.68}, {lat:41.77, lon:-72.65}, {lat:38.9, lon:-77.03}
+  ].forEach(function(m){
+    var dot = new THREE.Sprite(new THREE.SpriteMaterial({map: softDot(32), color:COLOR.frost, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+    dot.scale.set(0.16,0.16,1);
+    dot.position.copy(latLonToVec3(m.lat, m.lon, radius*1.03));
+    g.add(dot);
+  });
+  g.userData.isGlobe = true;
+  return g;
+}
+
+var globeGroup = null;
+function triggerGlobeFinale(){
+  globeGroup = buildGlobe();
+  globeGroup.position.set(0, 0.05, 0);
+  globeGroup.scale.setScalar(0.001);
+  globeGroup.userData.spawnTime = clock.getElapsedTime();
+  scene.add(globeGroup);
+
+  controls.enabled = false;
+  camera.position.set(0, 3.6, 5.4);
+  controls.target.set(0, 2.5, 0);
+  camera.lookAt(controls.target);
+  showToast('Three chapters, one throughline: a classroom program that grew into a dataset, a policy proposal, and now a wider vision. Machina Mundi is built to scale past Hartford and East Hartford, city by city.');
+  setTimeout(function(){ controls.enabled = true; }, 3200);
+}
+
+/* -------------------------------------------------------------------------
+   Three small cutscene buttons, bottom-left. Each flies the camera to a
+   real chapter of the story and plays a short vignette using elements
+   already in the room (torches, the ConvoAAVE pedestal, the vision
+   timeline) rather than new geometry. Light all three and a globe rises
+   at the center of the room.
+   ------------------------------------------------------------------------- */
+var HOME_CAM = new THREE.Vector3(0, 3.4, 9);
+var HOME_TARGET = new THREE.Vector3(0, 2.2, 0);
+
+var CUTSCENES = [
+  {
+    done:false,
+    run:function(onFinish){
+      var p = pedestals[0].position.clone();
+      flyTo(new THREE.Vector3(p.x*0.5, 2.6, p.z*0.5), new THREE.Vector3(p.x, 1.9, p.z));
+      setTimeout(function(){
+        torches.forEach(function(tg, ti){
+          setTimeout(function(){ tg.userData.boosted = 1.4; }, ti*220);
+        });
+        showToast('Three summer sessions, one small idea: give students in Hartford and East Hartford real hands-on access to the AI shaping their future.');
+      }, 1300);
+      setTimeout(function(){
+        flyTo(HOME_CAM, HOME_TARGET);
+        setTimeout(onFinish, 1200);
+      }, 3600);
+    }
+  },
+  {
+    done:false,
+    run:function(onFinish){
+      var p = pedestals[2].position.clone();
+      flyTo(new THREE.Vector3(p.x*0.5, 2.6, p.z*0.5), new THREE.Vector3(p.x, 1.9, p.z));
+      setTimeout(function(){
+        var icon = pedestals[2].userData.iconGroup;
+        if(icon && icon.userData.words){
+          icon.userData.words.children.forEach(function(w){ w.userData.radius *= 1.35; });
+          setTimeout(function(){
+            icon.userData.words.children.forEach(function(w){ w.userData.radius /= 1.35; });
+          }, 1600);
+        }
+        showToast('Nearly fifty thousand words of ConvoAAVE, recorded with consent and transcribed exactly as spoken -- the voices most language models were never built to hear.');
+      }, 1300);
+      setTimeout(function(){
+        flyTo(HOME_CAM, HOME_TARGET);
+        setTimeout(onFinish, 1200);
+      }, 3600);
+    }
+  },
+  {
+    done:false,
+    run:function(onFinish){
+      var p = hourglassGroup.position.clone();
+      flyTo(new THREE.Vector3(p.x*0.55, 2.8, p.z*0.55), new THREE.Vector3(p.x, 1.9, p.z));
+      setTimeout(function(){
+        milestoneNodes.forEach(function(node, ni){
+          setTimeout(function(){ node.scale.setScalar(1.6); node.userData.pulse = 1; }, ni*150);
+        });
+        showToast('A federal grant proposal introduced in 2026, testimony before Congress next -- the research that started in one classroom is aimed at a national scale now.');
+      }, 1300);
+      setTimeout(function(){
+        flyTo(HOME_CAM, HOME_TARGET);
+        setTimeout(onFinish, 1200);
+      }, 3600);
+    }
+  }
+];
+
+var cutsceneCompleted = 0;
+document.querySelectorAll('.cs-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var idx = parseInt(btn.getAttribute('data-cs'), 10);
+    var cs = CUTSCENES[idx];
+    if(STATE !== 'explore' || cs.done || btn.classList.contains('playing')) return;
+    btn.classList.add('playing');
+    cs.run(function(){
+      btn.classList.remove('playing');
+      btn.classList.add('done');
+      cs.done = true;
+      cutsceneCompleted++;
+      if(cutsceneCompleted === CUTSCENES.length){
+        setTimeout(triggerGlobeFinale, 500);
+      }
+    });
+  });
+});
+
 function setActiveStop(idx){
   idx = ((idx % STOPS.length) + STOPS.length) % STOPS.length;
   currentStopIndex = idx;
@@ -2641,6 +2841,16 @@ function animate(){
       ring.scale.setScalar(1+Math.sin(t*2)*0.06);
     }
   });
+
+  // globe finale: rises and scales in once summoned, then just spins idly
+  if(globeGroup){
+    var globeAge = t - globeGroup.userData.spawnTime;
+    var riseT = Math.min(1, globeAge/1.4);
+    var ease = 1 - Math.pow(1-riseT, 3);
+    globeGroup.position.y = 0.05 + (2.5-0.05)*ease;
+    globeGroup.scale.setScalar(0.001 + (1-0.001)*ease);
+    globeGroup.rotation.y += dt*0.15;
+  }
 
   // podium flag wave, mirror frame glow
   flagCloth.rotation.y = Math.sin(t*2.2)*0.15;
@@ -2816,6 +3026,7 @@ function animate(){
         document.getElementById('visit-link').classList.add('show');
         document.getElementById('nav-prev').classList.add('show');
         document.getElementById('nav-next').classList.add('show');
+        document.getElementById('cutscene-buttons').classList.add('show');
         currentStopIndex = 0;
         document.getElementById('stop-caption-num').textContent = '01 / ' + String(STOPS.length).padStart(2,'0');
         document.getElementById('stop-caption-name').textContent = STOPS[0].title;
