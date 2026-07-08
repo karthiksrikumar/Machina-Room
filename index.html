@@ -335,12 +335,12 @@
 
   <div id="intro-instructions">
     <div class="push-label">Push the doors</div>
-    <div class="sub">click and hold the glass doors to enter</div>
+    <div class="sub">click and hold the glass doors to enter &nbsp;&middot;&nbsp; full story at machinamundi.vercel.app</div>
   </div>
 
   <div id="welcome-overlay"><div id="welcome-text">Welcome to Machina Mundi</div></div>
 
-  <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click anything that glows &nbsp;&middot;&nbsp; &#8592; &#8594; moves through the story</div></div>
+  <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click anything that glows &nbsp;&middot;&nbsp; &#8592; &#8594; moves through the story &nbsp;&middot;&nbsp; visit machinamundi.vercel.app for more</div></div>
 
   <div id="panel">
     <button id="panel-close" aria-label="Close">&times;</button>
@@ -2359,7 +2359,7 @@ function onPointerDown(e){
   while(p){
     if(p.userData && p.userData.isBall){ handleBallClick(p); return; }
     if(p === armillary){ 
-      showToast('You have found the center of Machina Mundi.');
+      showToast('You have found the center of Machina Mundi. Keep exploring at machinamundi.vercel.app.');
       return;
     }
     p = p.parent;
@@ -2457,7 +2457,7 @@ document.getElementById('guestbook-submit').addEventListener('click', function()
   var val = guestbookInput.value.trim();
   if(val){
     addGuestMessage(val);
-    showToast('Thank you. Your voice has been added.');
+    showToast('Thank you. Your voice has been added. See the full story and get involved at machinamundi.vercel.app.');
   }
   closeGuestbook();
 });
