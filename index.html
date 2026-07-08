@@ -37,6 +37,13 @@
     -webkit-tap-highlight-color: transparent;
   }
   #c{ position:fixed; inset:0; display:block; outline:none; }
+  /* Pure CSS vignette: composited by the browser on top of the canvas, so it
+     costs nothing in the Three.js render loop. Darkens the frame edges a
+     touch so the eye settles on the room instead of the screen border. */
+  #vignette{
+    position:fixed; inset:0; z-index:5; pointer-events:none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.38) 100%);
+  }
 
   /* ---------- Loading ---------- */
   #loading{
@@ -307,6 +314,7 @@
 <body>
 
   <canvas id="c"></canvas>
+  <div id="vignette"></div>
 
   <div id="loading">
     <div class="ring-spin"></div>
@@ -700,6 +708,9 @@ scene.add(rimLight2);
    Floor
    ------------------------------------------------------------------------- */
 var floorTex = mosaicFloorTexture(1024);
+// Anisotropic filtering: a one-time sampler setting, sharpens the mosaic
+// detail at the shallow viewing angle the floor is almost always seen at.
+floorTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 var floor = new THREE.Mesh(
   new THREE.CircleGeometry(ROOM_R, 72),
   new THREE.MeshStandardMaterial({ map:floorTex, roughness:0.55, metalness:0.08 })
@@ -713,6 +724,7 @@ scene.add(floor);
    ------------------------------------------------------------------------- */
 var wallTex = marbleTexture(COLOR.marble, COLOR.marbleDim, 512);
 wallTex.repeat.set(6,1.4);
+wallTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 var wall = new THREE.Mesh(
   new THREE.CylinderGeometry(ROOM_R, ROOM_R, 9, 64, 1, true, DOOR_ANGLE+GAP/2, Math.PI*2-GAP),
   new THREE.MeshStandardMaterial({ map:wallTex, side:THREE.BackSide, roughness:0.85, metalness:0.02 })
@@ -762,11 +774,14 @@ for(var i=0;i<N_COL;i++){
   var colGroup = new THREE.Group();
   var shaftMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.48,6.4,16), new THREE.MeshStandardMaterial({map:colTex, roughness:0.7}));
   shaftMesh.position.y = 3.6; shaftMesh.castShadow = true;
-  var base = new THREE.Mesh(new THREE.CylinderGeometry(0.66,0.7,0.42,16), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.7}));
+  // Base and abacus get a faint emissive tint (same material property, no new
+  // geometry/draw calls) so each column reads with a quiet top-and-bottom
+  // accent glow instead of flat gray, tying it into the room's blue palette.
+  var base = new THREE.Mesh(new THREE.CylinderGeometry(0.66,0.7,0.42,16), new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.7, emissive:COLOR.bronze, emissiveIntensity:0.06}));
   base.position.y = 0.4;
   var capital = new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.44,0.5,16), new THREE.MeshStandardMaterial({color:COLOR.marble, roughness:0.6}));
   capital.position.y = 7.05;
-  var abacus = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.22,1.2), new THREE.MeshStandardMaterial({color:COLOR.bronze, roughness:0.4, metalness:0.5}));
+  var abacus = new THREE.Mesh(new THREE.BoxGeometry(1.2,0.22,1.2), new THREE.MeshStandardMaterial({color:COLOR.bronze, roughness:0.4, metalness:0.5, emissive:COLOR.bronze, emissiveIntensity:0.35}));
   abacus.position.y = 7.4;
   colGroup.add(shaftMesh, base, capital, abacus);
   colGroup.position.set(cx, 0, cz);
@@ -1298,15 +1313,26 @@ function addPictureFrame(file, angle, y, baseSize, isBig, ni){
     var glow = 0.06, border = 0.14;
     var innerW = Math.round(w * PPU), innerH = Math.round(h * PPU);
     var borderPx = Math.round(border * PPU), glowPx = Math.round(glow * PPU);
+    // A margin of transparent canvas around the frame for a baked drop shadow
+    // to fall into -- baked once here, so it costs nothing at render time,
+    // but reads as the frame actually hanging off the wall instead of being
+    // pasted flat onto it.
+    var shadowMargin = 14;
     var canvas = document.createElement('canvas');
-    canvas.width = innerW + (borderPx + glowPx) * 2;
-    canvas.height = innerH + (borderPx + glowPx) * 2;
+    canvas.width = innerW + (borderPx + glowPx) * 2 + shadowMargin * 2;
+    canvas.height = innerH + (borderPx + glowPx) * 2 + shadowMargin * 2;
     var ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = 6;
     ctx.fillStyle = hexColor(BRAND[ni % BRAND.length]);
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(shadowMargin, shadowMargin, canvas.width - shadowMargin * 2, canvas.height - shadowMargin * 2);
+    ctx.restore();
     ctx.fillStyle = hexColor(COLOR.blackSoft);
-    ctx.fillRect(glowPx, glowPx, canvas.width - glowPx * 2, canvas.height - glowPx * 2);
-    ctx.drawImage(img, glowPx + borderPx, glowPx + borderPx, innerW, innerH);
+    ctx.fillRect(shadowMargin + glowPx, shadowMargin + glowPx, canvas.width - (shadowMargin + glowPx) * 2, canvas.height - (shadowMargin + glowPx) * 2);
+    ctx.drawImage(img, shadowMargin + glowPx + borderPx, shadowMargin + glowPx + borderPx, innerW, innerH);
 
     var tex = new THREE.CanvasTexture(canvas);
     tex.encoding = THREE.sRGBEncoding;
@@ -1314,7 +1340,7 @@ function addPictureFrame(file, angle, y, baseSize, isBig, ni){
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
 
-    var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:false }));
+    var sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, transparent:true }));
     sprite.scale.set(canvas.width / PPU, canvas.height / PPU, 1);
     var nx = Math.cos(angle) * (ROOM_R - 0.28), nz = Math.sin(angle) * (ROOM_R - 0.28);
     sprite.position.set(nx, y, nz);
@@ -1760,7 +1786,7 @@ var spotlightStand = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.08,1.9,10)
 spotlightStand.position.y = 0.95;
 var spotlightBase = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.48,0.14,16), new THREE.MeshStandardMaterial({color:COLOR.black, roughness:0.5}));
 spotlightBase.position.y = 0.07;
-var spotlightPhoto = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.Texture(), transparent:false }));
+var spotlightPhoto = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.Texture(), transparent:true }));
 spotlightPhoto.position.y = 2.05;
 spotlightGroup.add(spotlightStand, spotlightBase, spotlightPhoto);
 var spotlightAngle = arcStart + arcSpan*0.22;
@@ -1784,15 +1810,23 @@ function loadSpotlightFrame(idx){
     var aspect = img.naturalWidth / (img.naturalHeight || 1);
     var h = 1.15, w = h*aspect;
     if(w > h*1.9){ w = h*1.9; } if(w < h*0.5){ w = h*0.5; }
-    var pad = 0.1, ppu = 220;
+    var pad = 0.1, ppu = 220, shadowMargin = 16;
     var canvas = document.createElement('canvas');
-    canvas.width = Math.round((w+pad*2)*ppu); canvas.height = Math.round((h+pad*2)*ppu);
+    canvas.width = Math.round((w+pad*2)*ppu) + shadowMargin*2;
+    canvas.height = Math.round((h+pad*2)*ppu) + shadowMargin*2;
     var ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1E90FF'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetX = 4;
+    ctx.shadowOffsetY = 6;
+    ctx.fillStyle = '#1E90FF';
+    ctx.fillRect(shadowMargin, shadowMargin, canvas.width-shadowMargin*2, canvas.height-shadowMargin*2);
+    ctx.restore();
     ctx.fillStyle = '#0c1016';
     var bp = Math.round(pad*0.5*ppu);
-    ctx.fillRect(bp,bp,canvas.width-bp*2,canvas.height-bp*2);
-    ctx.drawImage(img, Math.round(pad*ppu), Math.round(pad*ppu), Math.round(w*ppu), Math.round(h*ppu));
+    ctx.fillRect(shadowMargin+bp, shadowMargin+bp, canvas.width-shadowMargin*2-bp*2, canvas.height-shadowMargin*2-bp*2);
+    ctx.drawImage(img, shadowMargin+Math.round(pad*ppu), shadowMargin+Math.round(pad*ppu), Math.round(w*ppu), Math.round(h*ppu));
     var tex = new THREE.CanvasTexture(canvas);
     tex.encoding = THREE.sRGBEncoding;
     tex.generateMipmaps = false;
