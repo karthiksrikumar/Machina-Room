@@ -1814,7 +1814,7 @@ loadSpotlightFrame(0);
    pedestal, plus (for the one with a laptop) a single small baked canvas
    texture for the screen.
    ------------------------------------------------------------------------- */
-function laptopScreenTexture(){
+function laptopScreenTexture(line1, line2){
   var c = document.createElement('canvas'); c.width = 256; c.height = 176;
   var ctx = c.getContext('2d');
   ctx.fillStyle = '#04121a'; ctx.fillRect(0, 0, c.width, c.height);
@@ -1823,20 +1823,21 @@ function laptopScreenTexture(){
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.shadowColor = 'rgba(30,144,255,0.85)'; ctx.shadowBlur = 16;
   ctx.fillStyle = '#1E90FF';
-  ctx.font = '700 32px "Space Grotesk", monospace';
-  ctx.fillText('AAVE-LLM', c.width / 2, c.height / 2 - 12);
+  ctx.font = '700 30px "Space Grotesk", monospace';
+  ctx.fillText(line1 || 'AAVE-LLM', c.width / 2, c.height / 2 - 12);
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#8fa2b3';
   ctx.font = '300 13px Jost, sans-serif';
-  ctx.fillText('training in progress...', c.width / 2, c.height / 2 + 26);
+  ctx.fillText(line2 || 'training in progress...', c.width / 2, c.height / 2 + 26);
   return new THREE.CanvasTexture(c);
 }
 
 // A proper hinged laptop: a flat deck plus a lid that pivots open from the
 // deck's back edge (rather than two separately-positioned boxes that don't
 // actually meet at a hinge, which is what made the earlier version render
-// oddly). Reused for both the walking kid and the kid at the desk below.
-function buildLaptop(){
+// oddly). Reused for the walking kid and every kid at a desk below; the
+// screen text varies per instance to hint at what each kid is working on.
+function buildLaptop(screenLine1, screenLine2){
   var group = new THREE.Group();
   var mat = new THREE.MeshStandardMaterial({color:0x1c2430, metalness:0.5, roughness:0.4});
   var deck = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.018,0.22), mat);
@@ -1847,7 +1848,7 @@ function buildLaptop(){
   lidPivot.rotation.x = -1.95; // opened to roughly 110 degrees off the deck
   var lid = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.19,0.012), mat);
   lid.position.set(0,0.095,0); // lid's own bottom edge sits at the hinge
-  var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.26,0.15), new THREE.MeshBasicMaterial({map: laptopScreenTexture()}));
+  var screen = new THREE.Mesh(new THREE.PlaneGeometry(0.26,0.15), new THREE.MeshBasicMaterial({map: laptopScreenTexture(screenLine1, screenLine2)}));
   screen.position.set(0,0.095,0.0065);
   lidPivot.add(lid, screen);
   group.add(lidPivot);
@@ -1902,18 +1903,26 @@ var WALK_Z_END = DOOR_Z + 11;
 var WALK_DIST = WALK_Z_END - WALK_Z_START;
 
 var aaveWalker = createKidWalker(COLOR.blue, 0x6b4226, true);
+aaveWalker.userData.toastText = 'This is what the work looks like in practice. AI Pathways Camp teaches students to train small machine learning models themselves, not just use ones built by someone else. AAVE-LLM, on that screen, is what happens when a student turns that training on the program’s own mission: teaching a model to understand African American Vernacular English instead of flattening it into standard English the way most commercial models do.';
 scene.add(aaveWalker);
 
 // A few more kids, drawn from the same skin-tone and brand-color palettes
 // used throughout the room, pacing slow circles at different radii so they
-// never collide with each other or with the doorway walker.
+// never collide with each other or with the doorway walker. Each carries a
+// specific, real detail about the program rather than a generic line.
 var KIDS = [
   { group: aaveWalker, mode:'door', speed: 0.55 },
-  { group: createKidWalker(COLOR.aqua, SKIN_TONES[0], false), mode:'circle', radius: 4.6, phase: 0.0, speed: 0.16 },
-  { group: createKidWalker(COLOR.amethyst, SKIN_TONES[3], false), mode:'circle', radius: 6.4, phase: Math.PI * 0.66, speed: 0.13 },
-  { group: createKidWalker(COLOR.frost, SKIN_TONES[5], false), mode:'circle', radius: 5.5, phase: Math.PI * 1.3, speed: 0.19 }
+  { group: createKidWalker(COLOR.aqua, SKIN_TONES[0], false), mode:'circle', radius: 4.6, phase: 0.0, speed: 0.16,
+    toast: 'More than nine hundred students have come through AI Pathways Camp so far, in Hartford and East Hartford alike. Most started exactly like this, walking in not knowing what a language model even was, and left having trained one.' },
+  { group: createKidWalker(COLOR.amethyst, SKIN_TONES[3], false), mode:'circle', radius: 6.4, phase: Math.PI * 0.66, speed: 0.13,
+    toast: 'Code Ninjas hosted the earliest version of this program and helped shape the beginner curriculum. The YMCA later carried it beyond the classroom, into after-school programming across both cities.' },
+  { group: createKidWalker(COLOR.frost, SKIN_TONES[5], false), mode:'circle', radius: 5.5, phase: Math.PI * 1.3, speed: 0.19,
+    toast: 'Every word in ConvoAAVE was recorded with the consent of the person speaking, then transcribed exactly as spoken rather than smoothed into standard English. Nearly fifty thousand words so far, and growing.' }
 ];
-KIDS.forEach(function(k){ if(k.group !== aaveWalker) scene.add(k.group); });
+KIDS.forEach(function(k){
+  if(k.toast) k.group.userData.toastText = k.toast;
+  if(k.group !== aaveWalker) scene.add(k.group);
+});
 
 /* -------------------------------------------------------------------------
    Study table — a kid off to the side, seated and working at a laptop.
@@ -1921,7 +1930,8 @@ KIDS.forEach(function(k){ if(k.group !== aaveWalker) scene.add(k.group); });
    from above. Idle animation only (typing hands, a slight head tilt), no
    walking, so it costs even less than the pacing kids.
    ------------------------------------------------------------------------- */
-function buildStudyTable(){
+function buildStudyTable(shirt, skin, screenLine1, screenLine2){
+  shirt = shirt || COLOR.aqua; skin = skin || SKIN_TONES[2];
   var g = new THREE.Group();
   var surfaceMat = new THREE.MeshStandardMaterial({color:COLOR.marbleDim, roughness:0.6});
   var legMat = new THREE.MeshStandardMaterial({color:COLOR.blackSoft, roughness:0.5, metalness:0.3});
@@ -1948,7 +1958,6 @@ function buildStudyTable(){
     g.add(leg);
   });
 
-  var shirt = COLOR.aqua, skin = SKIN_TONES[2];
   var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.17,0.36,10), new THREE.MeshStandardMaterial({color:shirt, roughness:0.6}));
   torso.position.set(0,0.62,0.5);
   var head = new THREE.Mesh(new THREE.SphereGeometry(0.16,14,14), new THREE.MeshStandardMaterial({color:skin, roughness:0.55}));
@@ -1971,7 +1980,7 @@ function buildStudyTable(){
 
   g.add(torso, head, hair, thighL, thighR, shinL, shinR, armL, armR);
 
-  var laptop = buildLaptop();
+  var laptop = buildLaptop(screenLine1, screenLine2);
   laptop.position.set(0,0.75,0.15);
   laptop.rotation.x = -0.05;
   g.add(laptop);
@@ -1987,12 +1996,32 @@ function buildStudyTable(){
   return g;
 }
 
-var studyTable = buildStudyTable();
-var studyTableAngle = arcStart + arcSpan*0.9;
-var studyTableRadius = 8.2;
-studyTable.position.set(Math.cos(studyTableAngle)*studyTableRadius, 0, Math.sin(studyTableAngle)*studyTableRadius);
-studyTable.lookAt(0, 0.7, 0);
-scene.add(studyTable);
+var STUDY_TABLE_SPOTS = [
+  {
+    shirt: COLOR.aqua, skin: SKIN_TONES[2], angleFrac: 0.9, radius: 8.2,
+    screen: ['AAVE-LLM', 'training in progress...'],
+    toast: 'Off to the side, the quieter side of the work: hours at a laptop, training small machine learning models by hand. This is the actual, unglamorous shape of AI Pathways Camp -- not a lecture, a kid debugging their own model.'
+  },
+  {
+    shirt: COLOR.amethyst, skin: SKIN_TONES[6], angleFrac: 0.46, radius: 7.0,
+    screen: ['ConvoAAVE', 'transcribing audio...'],
+    toast: 'This is where ConvoAAVE actually gets built: recorded conversation transcribed word for word, exactly as spoken, with the consent of everyone recorded. No smoothing it into standard English. Nearly fifty thousand words logged this way so far.'
+  },
+  {
+    shirt: COLOR.blue, skin: SKIN_TONES[1], angleFrac: 0.58, radius: 9.0,
+    screen: ['H.R. Draft', 'policy brief v3'],
+    toast: 'Some of the work here happens far from a classroom. Research briefs written with guidance from the Congressional Research Service and Congressman John Larson’s office became the basis of a real federal grant proposal, introduced in 2026 to fund AI education in underserved schools.'
+  }
+];
+var studyTables = STUDY_TABLE_SPOTS.map(function(spot){
+  var t = buildStudyTable(spot.shirt, spot.skin, spot.screen[0], spot.screen[1]);
+  var angle = arcStart + arcSpan*spot.angleFrac;
+  t.position.set(Math.cos(angle)*spot.radius, 0, Math.sin(angle)*spot.radius);
+  t.lookAt(0, 0.7, 0);
+  t.userData.toastText = spot.toast;
+  scene.add(t);
+  return t;
+});
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
@@ -2130,7 +2159,7 @@ function onPointerDown(e){
   var targets = pedestals.concat([secretTile, armillary]).concat(torches).concat(voicesGroup.children)
     .concat(niches).concat([guestbookGroup]).concat(benches).concat([mapGroup, hourglassGroup]).concat(milestoneGroup.children)
     .concat([mirrorGroup, podiumGroup]).concat([impactGroup, spotlightGroup]).concat(KIDS.map(function(k){ return k.group; }))
-    .concat([studyTable]);
+    .concat(studyTables);
   var intersects = raycaster.intersectObjects(targets, true);
   if(!intersects.length) return;
   var root = findRoot(intersects[0].object);
@@ -2210,13 +2239,13 @@ function onPointerDown(e){
     return;
   }
   if(root.userData && root.userData.isWalker){
-    showToast(root.userData.hasLaptop
-      ? 'This is what the work looks like in practice: a student training AAVE-LLM, a small language model built to actually understand the way this community speaks.'
-      : 'Every student who walks through this program is part of why it exists.');
+    flyToKid(root);
+    showToast(root.userData.toastText);
     return;
   }
   if(root.userData && root.userData.isStudyTable){
-    showToast('Off to the side, the quieter side of the work: hours at a laptop, one small model getting a little better at understanding an entire community.');
+    flyToKid(root);
+    showToast(root.userData.toastText);
     return;
   }
   // ball click (search deeper since ball is nested under a pedestal icon group)
@@ -2354,6 +2383,21 @@ function flyToStop(idx){
   flyTo(camTo, lookTo);
 }
 
+// Moves the camera in toward a clicked kid: stands between the room center
+// and the kid (so the approach reads as walking up to them, not orbiting
+// around them) and looks at roughly head height.
+function flyToKid(group){
+  var wp = new THREE.Vector3();
+  group.getWorldPosition(wp);
+  var horiz = new THREE.Vector3(wp.x, 0, wp.z);
+  var dist = horiz.length();
+  var dir = dist > 0.001 ? horiz.clone().normalize() : new THREE.Vector3(0,0,1);
+  var standoff = 2.4;
+  var camTo = new THREE.Vector3(wp.x - dir.x*standoff, wp.y + 1.7, wp.z - dir.z*standoff);
+  var lookTo = new THREE.Vector3(wp.x, wp.y + 0.65, wp.z);
+  flyTo(camTo, lookTo);
+}
+
 var quoteEl = document.getElementById('quote-overlay');
 var quoteTextEl = document.getElementById('quote-text');
 function sitAtBench(bench){
@@ -2471,10 +2515,14 @@ function animate(){
     }
   });
 
-  // study table: idle typing hands and a slight head tilt
-  studyTable.userData.armL.position.y = studyTable.userData.armLBaseY + Math.sin(t*7)*0.012;
-  studyTable.userData.armR.position.y = studyTable.userData.armRBaseY + Math.sin(t*7 + 1.3)*0.012;
-  studyTable.userData.head.rotation.x = Math.sin(t*0.8)*0.06;
+  // study tables: idle typing hands and a slight head tilt, each phase-offset
+  // slightly (by index) so all three don't type in perfect unison
+  studyTables.forEach(function(st, sti){
+    var ph = sti * 1.7;
+    st.userData.armL.position.y = st.userData.armLBaseY + Math.sin(t*7 + ph)*0.012;
+    st.userData.armR.position.y = st.userData.armRBaseY + Math.sin(t*7 + 1.3 + ph)*0.012;
+    st.userData.head.rotation.x = Math.sin(t*0.8 + ph)*0.06;
+  });
 
   // armillary rotation
   armillary.rotation.y += dt*0.12;
