@@ -1294,11 +1294,11 @@ var GALLERY = [
 
 function hexColor(n){ return '#' + n.toString(16).padStart(6, '0'); }
 
-function addPictureFrame(file, angle, y, baseSize, isBig, ni){
+function addPictureFrame(file, angle, y, baseSize, sizeMult, ni){
   var img = new Image();
   img.onload = function(){
     var aspect = img.naturalWidth / (img.naturalHeight || 1);
-    var h = baseSize * (isBig ? 1.35 : 1);
+    var h = baseSize * sizeMult;
     var w = h * aspect;
     // Clamped well under a single column bay's width (~4.6 world units at the
     // wall) so a frame can never span wide enough to reach into a neighbor's
@@ -1371,15 +1371,20 @@ var BAY_ANGLES = (function(){
   return bays;
 })();
 
+var ymcaFrameAngle = null, ymcaFrameY = null;
 (function buildGallery(){
   var bandY = [2.25, 4.1, 5.95];
   GALLERY.forEach(function(file, i){
     var bayAngle = BAY_ANGLES[i % BAY_ANGLES.length];
     var ang = bayAngle + (Math.random() - 0.5) * 0.03;
     var y = bandY[i % bandY.length] + (Math.random() - 0.5) * 0.5;
-    var isBig = /ymca/i.test(file);
+    // MainYMCA.jpg is the room's centerpiece photo: the YMCA classroom that
+    // carried AI Pathways Camp beyond the school day. Sized to stand out from
+    // the rest of the wall; other ymca-named files stay at the smaller "big" tier.
+    var sizeMult = file === 'MainYMCA.jpg' ? 2.0 : (/ymca/i.test(file) ? 1.35 : 1);
     var baseSize = 0.62 + Math.random() * 0.26;
-    addPictureFrame(file, ang, y, baseSize, isBig, i);
+    addPictureFrame(file, ang, y, baseSize, sizeMult, i);
+    if(file === 'MainYMCA.jpg'){ ymcaFrameAngle = ang; ymcaFrameY = y; }
   });
 })();
 
@@ -2056,6 +2061,72 @@ var studyTables = STUDY_TABLE_SPOTS.map(function(spot){
   scene.add(t);
   return t;
 });
+
+/* -------------------------------------------------------------------------
+   A kid on a chair, just sitting and looking up at the big YMCA photo on
+   the wall -- no desk, no laptop, built from the same primitives as the
+   study-table kids so it's just as cheap and reuses their idle animation
+   and click-to-approach handling.
+   ------------------------------------------------------------------------- */
+function buildWatchingKid(shirt, skin){
+  var g = new THREE.Group();
+  var legMat = new THREE.MeshStandardMaterial({color:COLOR.blackSoft, roughness:0.5, metalness:0.3});
+  var chairSeat = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.05,0.4), legMat);
+  chairSeat.position.set(0,0.42,0);
+  var chairBack = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.4,0.05), legMat);
+  chairBack.position.set(0,0.65,-0.18);
+  g.add(chairSeat, chairBack);
+  var chairLegGeo = new THREE.CylinderGeometry(0.025,0.025,0.42,8);
+  [[-0.16,-0.15],[0.16,-0.15],[-0.16,0.15],[0.16,0.15]].forEach(function(o){
+    var leg = new THREE.Mesh(chairLegGeo, legMat);
+    leg.position.set(o[0],0.21,o[1]);
+    g.add(leg);
+  });
+
+  var torso = new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.17,0.36,10), new THREE.MeshStandardMaterial({color:shirt, roughness:0.6}));
+  torso.position.set(0,0.62,0);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.16,14,14), new THREE.MeshStandardMaterial({color:skin, roughness:0.55}));
+  head.position.set(0,0.92,0.02);
+  head.rotation.x = -0.4; // tilted up toward the frame overhead
+  var hair = new THREE.Mesh(new THREE.SphereGeometry(0.165,14,10,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0x14100c, roughness:0.8}));
+  hair.position.set(0,0.955,0.02);
+  hair.rotation.x = -0.4;
+
+  var limbMat = new THREE.MeshStandardMaterial({color:0x11141a, roughness:0.7});
+  var thighGeo = new THREE.CylinderGeometry(0.055,0.055,0.32,8);
+  var thighL = new THREE.Mesh(thighGeo, limbMat); thighL.rotation.x = Math.PI/2; thighL.position.set(-0.08,0.44,-0.15);
+  var thighR = thighL.clone(); thighR.position.x = 0.08;
+  var shinGeo = new THREE.CylinderGeometry(0.05,0.05,0.42,8);
+  var shinL = new THREE.Mesh(shinGeo, limbMat); shinL.position.set(-0.08,0.21,0);
+  var shinR = shinL.clone(); shinR.position.x = 0.08;
+
+  var armGeo = new THREE.CylinderGeometry(0.045,0.045,0.3,8);
+  var armMat = new THREE.MeshStandardMaterial({color:shirt, roughness:0.6});
+  var armL = new THREE.Mesh(armGeo, armMat); armL.rotation.z = Math.PI/2.3; armL.position.set(-0.18,0.6,0);
+  var armR = new THREE.Mesh(armGeo, armMat); armR.rotation.z = -Math.PI/2.3; armR.position.set(0.18,0.6,0);
+
+  g.add(torso, head, hair, thighL, thighR, shinL, shinR, armL, armR);
+  g.userData.isStudyTable = true; // reuses the study-table idle sway + click/raycast handling
+  g.userData.armL = armL; g.userData.armR = armR; g.userData.head = head;
+  g.userData.armLBaseY = armL.position.y; g.userData.armRBaseY = armR.position.y;
+  g.userData.rootGroup = g;
+  g.traverse(function(o){ o.userData.rootGroup = g; });
+  var hit = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,1.4,10), new THREE.MeshBasicMaterial({visible:false}));
+  hit.position.y = 0.6;
+  g.add(hit);
+  return g;
+}
+
+if(ymcaFrameAngle !== null){
+  var watchingKid = buildWatchingKid(COLOR.frost, SKIN_TONES[4]);
+  var wr = ROOM_R - 2.4;
+  var frameX = Math.cos(ymcaFrameAngle) * (ROOM_R - 0.28), frameZ = Math.sin(ymcaFrameAngle) * (ROOM_R - 0.28);
+  watchingKid.position.set(Math.cos(ymcaFrameAngle) * wr, 0, Math.sin(ymcaFrameAngle) * wr);
+  watchingKid.lookAt(frameX, watchingKid.position.y, frameZ);
+  watchingKid.userData.toastText = 'That YMCA classroom photo on the wall behind this chair is one of the places AI Pathways Camp actually happened. The YMCA carried the program beyond the school day, giving it a second home in the afternoons for families who needed one most.';
+  studyTables.push(watchingKid);
+  scene.add(watchingKid);
+}
 
 /* -------------------------------------------------------------------------
    Easter egg: a quietly different mosaic tile
