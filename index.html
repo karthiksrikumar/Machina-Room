@@ -504,10 +504,14 @@ var STOPS = [
    ------------------------------------------------------------------------- */
 var canvas = document.getElementById('c');
 var renderer = new THREE.WebGLRenderer({ canvas:canvas, antialias:true, powerPreference:'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+// Capped lower than devicePixelRatio's max of 3+ on many phones/laptops --
+// fragment cost scales with pixel count, so this alone can be a 2-4x saving
+// on high-DPI screens with no visible loss (bloom already softens edges).
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// No light in the scene casts a shadow anymore, so the shadow map pipeline
+// itself is switched off rather than left enabled-but-unused.
+renderer.shadowMap.enabled = false;
 renderer.outputEncoding = THREE.sRGBEncoding;
 
 var scene = new THREE.Scene();
@@ -530,8 +534,11 @@ var composer = null;
 if(THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass){
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
+  // Bloom is a blurred glow layer -- rendering its internal passes at full
+  // window resolution buys no visible sharpness, only cost. Half-resolution
+  // looks identical once blurred and composited, at a fraction of the pixels.
   var bloomPass = new THREE.UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(window.innerWidth*0.5, window.innerHeight*0.5),
     0.85,  // strength - moderate, glows accents without blowing out
     0.55,  // radius
     0.32   // threshold - only bright emissive/light sources bloom
@@ -717,10 +724,12 @@ function numeralSprite(n){
 var hemi = new THREE.HemisphereLight(0x3a5a7a, 0x05070a, 0.6);
 scene.add(hemi);
 
+// Not a shadow caster: a point light's shadow is a live 6-face cubemap
+// render of the whole scene every single frame, by far the heaviest thing
+// a WebGL scene can do -- and with fog, bloom, and everything else already
+// baked into the room's look, the shadow itself barely reads on top of it.
 var oculusLight = new THREE.PointLight(0xdfefff, 1.7, 42, 2);
 oculusLight.position.set(0, 12, 0);
-oculusLight.castShadow = true;
-oculusLight.shadow.mapSize.set(1024,1024);
 scene.add(oculusLight);
 
 var fillLight = new THREE.DirectionalLight(0x2a4a6a, 0.3);
@@ -2781,7 +2790,13 @@ window.addEventListener('resize', function(){
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  if(composer) composer.setSize(window.innerWidth, window.innerHeight);
+  if(composer){
+    composer.setSize(window.innerWidth, window.innerHeight);
+    // EffectComposer.setSize resets every pass to full resolution, so bloom
+    // needs to be put back to half-res explicitly or it silently loses the
+    // saving on the next window resize.
+    if(bloomPass) bloomPass.setSize(window.innerWidth*0.5, window.innerHeight*0.5);
+  }
 });
 
 /* -------------------------------------------------------------------------
