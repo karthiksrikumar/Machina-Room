@@ -120,11 +120,14 @@
   }
   #hud.show{ opacity:1; }
   #hud .pill{
-    font-size:11.5px; letter-spacing:0.12em; color:var(--c-marble-dim);
-    background:rgba(5,7,10,0.5); border:1px solid rgba(30,144,255,0.25);
-    padding:9px 20px; border-radius:100px; backdrop-filter: blur(6px);
-    font-weight:300;
+    font-size:23px; letter-spacing:0.03em; color:#fff;
+    background:rgba(5,7,10,0.65); border:1px solid rgba(30,144,255,0.4);
+    padding:16px 32px; border-radius:100px; backdrop-filter: blur(6px);
+    font-weight:800; transition:opacity 0.9s ease;
+    text-shadow:0 2px 10px rgba(0,0,0,0.6);
+    max-width:90vw; text-align:center;
   }
+  #hud.faded .pill{ opacity:0; }
 
   /* ---------- Cutscene buttons ---------- */
   #cutscene-buttons{
@@ -361,7 +364,7 @@
 
   <div id="welcome-overlay"><div id="welcome-text">Welcome to Machina Mundi</div></div>
 
-  <div id="hud"><div class="pill">Drag to look around &nbsp;&middot;&nbsp; click anything that glows &nbsp;&middot;&nbsp; &#8592; &#8594; moves through the story &nbsp;&middot;&nbsp; visit machinamundi.vercel.app for more</div></div>
+  <div id="hud"><div class="pill">Drag or WASD to move &nbsp;&middot;&nbsp; click anything that glows &nbsp;&middot;&nbsp; &#8592; &#8594; moves through the story &nbsp;&middot;&nbsp; visit machinamundi.vercel.app for more</div></div>
 
   <div id="cutscene-buttons">
     <button class="cs-btn" data-cs="0" title="Origins">I</button>
@@ -2280,6 +2283,10 @@ function onPointerDown(e){
   setPointer(e);
   raycaster.setFromCamera(pointer, camera);
 
+  if(STATE === 'explore'){
+    document.getElementById('hud').classList.add('faded');
+  }
+
   if(STATE === 'door'){
     var hitDoor = raycaster.intersectObject(doorHit, false);
     if(hitDoor.length){ openDoors(); }
@@ -2736,6 +2743,20 @@ document.getElementById('nav-next').addEventListener('click', function(){
   setActiveStop(currentStopIndex<0 ? 0 : currentStopIndex+1);
 });
 
+// WASD walking: translates both the camera and its orbit target together,
+// so drag-to-look keeps working exactly as before while these keys move
+// you through the room instead of orbiting in place.
+var wasdKeys = { w:false, a:false, s:false, d:false };
+window.addEventListener('keydown', function(e){
+  if(e.target && (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT')) return;
+  var k = e.key.toLowerCase();
+  if(k in wasdKeys) wasdKeys[k] = true;
+});
+window.addEventListener('keyup', function(e){
+  var k = e.key.toLowerCase();
+  if(k in wasdKeys) wasdKeys[k] = false;
+});
+
 var keyBuffer = '';
 window.addEventListener('keydown', function(e){
   if(STATE !== 'explore') return;
@@ -3042,6 +3063,36 @@ function animate(){
       if(cameraFly.t>=1){ cameraFly = null; controls.enabled = true; }
     }
     controls.update();
+
+    // WASD walking: translate camera + orbit target together by the same
+    // delta, so whatever direction you're currently looking (drag-controlled)
+    // stays put while W/S move you along it and A/D strafe across it.
+    if(!cameraFly && controls.enabled && (wasdKeys.w||wasdKeys.a||wasdKeys.s||wasdKeys.d)){
+      var walkFwd = new THREE.Vector3().subVectors(controls.target, camera.position);
+      walkFwd.y = 0;
+      if(walkFwd.lengthSq() > 0.0001) walkFwd.normalize(); else walkFwd.set(0,0,1);
+      var walkRight = new THREE.Vector3().crossVectors(walkFwd, new THREE.Vector3(0,1,0)).normalize();
+      var walkMove = new THREE.Vector3();
+      if(wasdKeys.w) walkMove.add(walkFwd);
+      if(wasdKeys.s) walkMove.addScaledVector(walkFwd, -1);
+      if(wasdKeys.d) walkMove.add(walkRight);
+      if(wasdKeys.a) walkMove.addScaledVector(walkRight, -1);
+      if(walkMove.lengthSq() > 0.0001){
+        walkMove.normalize().multiplyScalar(dt*4.2);
+        var wtx = controls.target.x + walkMove.x, wtz = controls.target.z + walkMove.z;
+        var wDist = Math.hypot(wtx, wtz);
+        if(wDist > ROOM_R - 1.6){
+          var wScale = (ROOM_R - 1.6) / wDist;
+          wtx *= wScale; wtz *= wScale;
+          walkMove.x = wtx - controls.target.x;
+          walkMove.z = wtz - controls.target.z;
+        }
+        camera.position.x += walkMove.x; camera.position.z += walkMove.z;
+        controls.target.x += walkMove.x; controls.target.z += walkMove.z;
+        document.getElementById('hud').classList.add('faded');
+      }
+    }
+
     // A barely-there idle sway so the view never looks perfectly static,
     // applied after controls.update() so it can't fight with orbit dragging
     // or accumulate -- it's re-derived fresh from t every frame.
